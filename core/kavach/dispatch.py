@@ -13,7 +13,7 @@ import uuid
 
 from filelock import FileLock
 
-from . import modes, paths
+from . import graphindex, modes, paths, scoping
 from .finding import load_findings
 from .findings_tree import slugify, write_draft
 
@@ -119,13 +119,38 @@ def _resolved_references(phase: str, agent: str | None) -> tuple[list[str], list
     return found, missing
 
 
-def _existing_inputs(mode: str, phase: str, audit_dir: str) -> list[str]:
+def _existing_inputs(mode: str, phase: str, audit_dir: str, agent: str | None = None) -> list[str]:
     out = []
     for rel in modes.inputs_for(mode, phase):
         path = os.path.join(os.path.abspath(audit_dir), rel)
         if os.path.exists(path):
             out.append(path)
+    for rel in (os.path.join("attack-surface", scoping.artifact_name(agent)),
+                os.path.join("attack-surface", scoping.artifact_name(None))):
+        path = os.path.join(os.path.abspath(audit_dir), rel)
+        if os.path.exists(path) and path not in out:
+            out.append(path)
+            break       # the agent's own scope wins; the repo-wide one is the fallback
+    slice_path = _slice_path(audit_dir, phase, agent)
+    if slice_path:
+        out.append(slice_path)
     return out
+
+
+def _slice_path(audit_dir: str, phase: str, agent: str | None, index: int | None = None) -> str | None:
+    """A slice written by `kavach slice` for this dispatch, if one exists. Named explicitly
+    because a hunter handed the whole findings.json reads the whole findings.json."""
+    if not agent:
+        return None
+    d = os.path.join(os.path.abspath(audit_dir), "runs", slugify(phase), "slices")
+    stem = slugify(agent)
+    for candidate in ([f"{stem}-{index}.json"] if index else []) + [f"{stem}.json"]:
+        path = os.path.join(d, candidate)
+        if os.path.exists(path):
+            return path
+    for path in sorted(glob.glob(os.path.join(d, f"{stem}-*.json"))):
+        return path
+    return None
 
 
 def phase_prompt(mode: str, phase: str, audit_dir: str, target: str, *,
@@ -137,12 +162,13 @@ def phase_prompt(mode: str, phase: str, audit_dir: str, target: str, *,
     spec = modes.spec_for(phase)
     executor = agent or modes.PHASE_AGENT.get(phase, "")
     found, missing = _resolved_references(phase, executor)
-    inputs = _existing_inputs(mode, phase, audit_dir)
+    inputs = _existing_inputs(mode, phase, audit_dir, executor)
 
     body = ["## Read these first", "", "References:", _bullets(found)]
     if missing:
         body += ["", f"  Not installed on this machine, so unavailable to you: {', '.join(missing)}"]
-    body += ["", "Audit inputs:", _bullets(inputs), "", "---", "", "## Your task", "", spec.task]
+    body += ["", "Audit inputs:", _bullets(inputs), "", "---", "",
+             graphindex.prompt_section(audit_dir), "---", "", "## Your task", "", spec.task]
     if spec.roster and len(spec.roster) > 1:
         peers = ", ".join(a for a in spec.roster if a != executor)
         body += ["", f"You are one of {len(spec.roster)} agents on this phase "
@@ -169,11 +195,13 @@ def dispatch_plan(mode: str, phase: str, audit_dir: str, target: str) -> dict:
         "prereqs": modes.prereqs_for(mode, phase),
         "gate": [os.path.join(out, g) for g in modes.gate_for(phase)],
         "inputs": _existing_inputs(mode, phase, out),
+        "graph": graphindex.read_status(out),
         "dispatches": [
             {
                 "agent": name,
                 "index": i,
                 "references": modes.references_for(phase, name),
+                "inputs": _existing_inputs(mode, phase, out, name),
                 "result_path": result_path(out, phase, name, index=i if len(roster) > 1 else None),
             }
             for i, name in enumerate(roster, start=1)

@@ -5,6 +5,41 @@ All notable changes to Adhunik Kavach are documented here. Format follows
 
 ## [Unreleased]
 
+### Discovery cost: the code graph and the scope
+
+A hunter spends most of its budget on *discovery* - grep for a symbol, open the file, follow the
+import, repeat - before it reaches the line it will finally cite. Two optional inputs cut that.
+
+- **`kavach graph index <target>`** - shells out to
+  [codegraph](https://github.com/colbymchenry/codegraph) and records the outcome in
+  `attack-surface/graph-status.json`. The engine never queries the graph; it establishes whether
+  one exists so every dispatch prompt can tell the agent to answer structural questions from it
+  before reaching for grep - or say plainly that there is none, because an agent that assumes a
+  tool it does not have burns a turn finding out. Missing binary, failed index and timeout all
+  give `available: false` with the reason and exit `0`: this is a scanner, not a prerequisite.
+  The instruction goes to *every* hunter, not a coordinator - a fan-out where sub-agents still
+  read files pays for the index and keeps the crawl.
+- **`kavach scope [--agent A] [--limit N]`** - ranks `file-manifest.txt` by security relevance
+  into `attack-surface/scope[-<agent>].json`, which `phase-prompt` names as an input (an agent's
+  own scope wins over the repo-wide one). Deterministic and path-shaped: no model, no content
+  read, because those cost what this exists to save. A high rank is "look here first", never "the
+  bug is here" - the manifest still holds every file and the artifact says so.
+- `phase-prompt` also names a slice written by `kavach slice` for that dispatch, so a hunter is
+  pointed at its own leads rather than the whole finding set.
+
+### Fixed
+
+- **Signals match path tokens, not substrings.** `frag in path` read `ci` out of
+  "dependen*ci*es", `api` out of "r*api*d", `key` out of "mon*key*" - the config hunter was
+  opening `auth/dependencies.py` because of a two-letter accident. Short signals must be a whole
+  token; longer ones may prefix one, which is what lets `authoriz` reach "authorization".
+- **Ranking is domain-first, then score.** A generic score sums, so an auth router collects
+  auth + session + route + api and outranked every hunter's own files - all eight hunters got the
+  same list, which is the same as having no per-domain scope at all.
+- **Vendored scaffolding is dampened.** A tree the target ships *to* its users reads as
+  application code to every path signal; `_bmad_template/.../review-prompts/*.md` outranked the
+  real prompt module for the LLM hunter.
+
 ### The engine owns the dispatch contract
 
 `phase-prompt` used to emit one line - `Execute phase BL3 (Static Analysis & Triage).` - and the
