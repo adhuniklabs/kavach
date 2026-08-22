@@ -49,6 +49,31 @@ commercial/hosted use - check before adding).
 - Fixtures use **fake, non-functional** secrets that our patterns catch but that don't trip real
   provider detectors (keep GitHub push protection green).
 
+## Versioning
+
+`kavach.__version__` is the only place a version number is written. `pyproject.toml` reads it via
+`dynamic = ["version"]`, and a test fails if a literal reappears there or if `CHANGELOG.md` has no
+section for the current version.
+
+SemVer, read for a 0.x project — **the minor is the breaking axis**:
+
+| Change | Bump |
+|---|---|
+| A phase id, the prereq graph, a gate artifact, or a CLI verb's output shape | **minor** |
+| A python API a harness calls (`dispatch.ingest`, `modes.*`) | **minor** |
+| A new verb, a new flag, a new scanner, a new agent | patch |
+| A fix with no contract change | patch |
+
+That mapping is not stylistic. `kavach resume` refuses to continue an audit whose recorded
+`engine_version` differs from the running engine in `major.minor`, because resume re-derives what
+is left from the phase contract — and finishing an audit under a contract different from the one
+that wrote its artifacts reports an incoherent result as a complete one. A minor bump is how you
+say "existing audits cannot be finished by this."
+
+Releasing: bump `__version__`, move `[Unreleased]` to the new version with a date, run the gates
+below, then tag `v<version>` and cut a GitHub release. The tag must match the version — the module
+manifest that installs kavach pins a tag and expects the version inside to agree.
+
 ## Before you open a PR
 
 ```bash
