@@ -517,6 +517,40 @@ def cmd_agents(args) -> int:
     return 0
 
 
+def cmd_graph(args) -> int:
+    from . import graphindex
+    out = _out_dir(args)
+    if args.graph_cmd == "status":
+        print(json.dumps(graphindex.read_status(out), indent=2))
+        return 0
+    timeout = args.timeout if args.timeout is not None else graphindex.DEFAULT_TIMEOUT
+    status = graphindex.index(args.path, out, force=args.force, timeout=timeout)
+    events.emit(out, "graph_index", available=status["available"],
+                reason=status.get("reason"), elapsed=status.get("elapsed_seconds"))
+    print(json.dumps(status, indent=2))
+    if not status["available"]:
+        # Not a failure: the graph is a scanner, not a prerequisite. Hunters grep instead
+        # and the prompt tells them to expect it.
+        _log(f"KAVACH graph → unavailable ({status['reason']}); hunters will fall back to grep")
+        return 0
+    _log(f"KAVACH graph → indexed {status['root']} in {status['elapsed_seconds']}s")
+    return 0
+
+
+def cmd_scope(args) -> int:
+    from . import scoping
+    out = _out_dir(args)
+    try:
+        result = scoping.write_scope(out, agent=args.agent, limit=args.limit)
+    except FileNotFoundError:
+        _log("KAVACH scope → no file-manifest.txt; run `kavach recon` first")
+        return 5
+    print(json.dumps(result, indent=2))
+    _log(f"KAVACH scope {args.agent or 'repo'} → top {result['ranked']} of "
+         f"{result['total_files']} file(s)")
+    return 0
+
+
 def cmd_slice(args) -> int:
     from . import slicing
     out = _out_dir(args)
@@ -889,6 +923,19 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--with-body", action="store_true",
                     help="include the agent's prompt body (implies a single --name)")
     sp.set_defaults(func=cmd_agents)
+
+    sp = sub.add_parser("graph", help="optional code-graph index: build it, or report on it")
+    sp.add_argument("graph_cmd", choices=["index", "status"]); add_common(sp)
+    sp.add_argument("path", nargs="?", default=".", help="target repo root (index)")
+    sp.add_argument("--force", action="store_true", help="re-index instead of syncing")
+    sp.add_argument("--timeout", type=int, default=None, help="seconds before giving up")
+    sp.set_defaults(func=cmd_graph)
+
+    sp = sub.add_parser("scope", help="rank the file manifest by security relevance")
+    add_common(sp)
+    sp.add_argument("--agent", default=None, help="rank for one domain hunter")
+    sp.add_argument("--limit", type=int, default=200, help="how many files to point at, 0 = all")
+    sp.set_defaults(func=cmd_scope)
 
     sp = sub.add_parser("slice", help="cut one agent's lead list out of findings.json")
     sp.add_argument("phase"); add_common(sp)

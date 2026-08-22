@@ -648,3 +648,30 @@ class TestHarnessVerbs(unittest.TestCase):
         charged = [json.loads(ln) for ln in log.splitlines() if ln]
         self.assertEqual(charged[-1]["kind"], "budget_charge")
         self.assertEqual(charged[-1]["total_cost_usd"], 0.42)
+
+    def test_graph_status_on_an_unindexed_dir_reports_unavailable(self):
+        code, out = self._run("graph", "status", "--out", self.dir)
+        self.assertEqual(code, 0)
+        self.assertFalse(json.loads(out)["available"])
+
+    def test_graph_index_without_the_binary_exits_zero(self):
+        """The graph is optional like a scanner. A missing binary that failed the command
+        would turn an optimisation into a prerequisite."""
+        with mock.patch("kavach.graphindex.binary_path", return_value=None):
+            code, out = self._run("graph", "index", ".", "--out", self.dir)
+        self.assertEqual(code, 0)
+        self.assertFalse(json.loads(out)["available"])
+
+    def test_scope_needs_recon_first_and_says_so(self):
+        code, _ = self._run("scope", "--out", self.dir)
+        self.assertEqual(code, 5)
+
+    def test_scope_ranks_the_manifest_for_one_hunter(self):
+        with open(os.path.join(self.dir, "file-manifest.txt"), "w", encoding="utf-8") as fh:
+            fh.write("src/billing/webhook.ts\nsrc/utils/noop.ts\n")
+        code, out = self._run("scope", "--out", self.dir, "--agent", "kavach-billing")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["total_files"], 2)
+        with open(os.path.join(self.dir, "attack-surface", "scope-kavach-billing.json"),
+                  encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh)["files"][0]["path"], "src/billing/webhook.ts")
