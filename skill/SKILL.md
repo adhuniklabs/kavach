@@ -102,8 +102,15 @@ section - that record is the deliverable's honesty, so never work around the led
 without checking it.
 
 ```bash
-K budget show --out "$AUDIT"    # ceiling, spent, remaining, elapsed, every shed note
+K budget show --out "$AUDIT"    # ceilings, spent, remaining, elapsed, every shed note
+K events --out "$AUDIT"         # what the engine has done, one JSON object per line
 ```
+
+There is a **third ceiling** beside dispatches and wall clock: `--max-cost-usd`. The engine never
+calls a model, so it cannot measure spend - it is only real if whatever ran the model reports it
+back on `K budget charge --tokens-in N --tokens-out M --cost-usd C`. Running inside Claude Code you
+have no per-dispatch figure to report, so leave the cost ceiling at `0` (unlimited) and charge
+dispatch counts only. It exists for harnesses that pay per token and can.
 
 `diff` mode has pre-phase engine bookkeeping before any gated phase exists: run
 `K diff "$TARGET" --out "$AUDIT" ${SINCE:+--since "$SINCE"}` once, up front. It resolves the prior
@@ -132,21 +139,28 @@ Repeat until `K plan --out "$AUDIT" --mode "$MODE"` prints nothing:
    whose gate artifact doesn't exist yet, in mode order (`docs/phase-reference.md` has the prereq DAG
    per mode; deep's is non-linear, everything else is a straight chain).
 2. **Phase-prompt.** For each actionable phase: `K phase-prompt <phase> --out "$AUDIT" --mode "$MODE"
-   --target "$TARGET" [--agent <name>] [--index <i>]` prints the runtime header (target root, audit
-   dir, state path, mode/phase + label, assigned output paths, **the exact absolute path that
-   subagent must write its machine result to**, and the "write a failure note, don't fabricate"
-   instruction). **On any fan-out phase, pass `--agent <the agent you are about to dispatch>` and a
-   distinct 1-based `--index i` per dispatch.** Without `--index`, all eight BL3/DP4 hunters are
-   told to write `runs/dp4/kavach-sast.json` and clobber each other; the engine cannot detect that
-   for you. This is required, not optional. This is a
-   thin wrapper, not the agent's protocol - the dispatched `agents/kavach-<name>.md` file *is* that
-   agent's protocol once loaded via `subagent_type`. Your job composing the actual `Task` prompt is to
-   append the absolute paths that agent's own "Inputs" section names: `references/persona.md`, its
-   domain/protocol reference(s) (`references/domains/<domain>.md`, `references/chamber-protocol.md`,
-   `references/probe-protocol.md`, `references/verification-gates.md`, etc. - whichever the agent's
-   frontmatter/body point at), `references/finding-schema.md`, `references/severity-model.md`,
-   `$AUDIT/recon.json`, its slice of `$AUDIT/findings.json`, the target root, and the gate's output
-   path(s) from step 2's printout.
+   --target "$TARGET" [--agent <name>] [--index <i>]` prints **the whole dispatch, ready to send** -
+   the runtime header (target root, audit dir, state path, mode/phase + label, assigned output paths,
+   **the exact absolute path that subagent must write its machine result to**, and the "write a
+   failure note, don't fabricate" instruction), the absolute paths of every reference and audit input
+   that agent must read, and the phase's task. You do not assemble any of that yourself any more;
+   `modes.PHASE_SPECS` owns it, so this file and any other harness dispatch the same thing.
+   The dispatched `agents/kavach-<name>.md` file is still the agent's *method* - load it via
+   `subagent_type` as before.
+
+   **On any fan-out phase, pass `--agent <the agent you are about to dispatch>` and a distinct
+   1-based `--index i` per dispatch.** Without `--index`, all eight BL3/DP4 hunters are told to
+   write `runs/dp4/kavach-sast.json` and clobber each other; the engine cannot detect that for you.
+   This is required, not optional.
+
+   `K plan --out "$AUDIT" --mode "$MODE" --json --target "$TARGET"` returns the same thing for
+   every actionable phase at once - roster, per-dispatch index, result path, references, gate,
+   and whether the roster is sequential - so a scripted driver never has to consult `modes.py`.
+
+   **Cut each hunter its slice before you dispatch it:** `K slice <phase> --out "$AUDIT"
+   --agent <name> --index <i>` writes `runs/<phase>/slices/<agent>-<i>.json` with that domain's
+   leads and a count of what was left to other domains. Sending all eight hunters the whole
+   `findings.json` pays for the same 300 rows eight times.
 3. **Execute.** Look up `PHASE_AGENT[phase]` (`core/kavach/modes.py`, mirrored in
    `docs/phase-reference.md`):
    - **`core:<fn>`** - a deterministic step, no `Task` call. Run the matching command:
@@ -159,8 +173,8 @@ Repeat until `K plan --out "$AUDIT" --mode "$MODE"` prints nothing:
      | `core:cleanup` | `K cleanup --out "$AUDIT" --mode "$MODE"` |
      | `core:merge` (BL3/DP4 fan-out ingest) | `K merge --out "$AUDIT" --extra "$AUDIT"/runs/<phase>/*.json` (the engine now names every result file; `agent-*.json` at the audit root is legacy) |
      | `core:merge` (`MG1,MG3-MG6` - merge mode) | `K merge-run --out "$AUDIT" --dir <source-1> --dir <source-2> [...]` - one deterministic pass over every source audit dir (each with its own `findings.json`): MG1 aliases + dedupes into `findings-index.json`, MG5 severity-renumbers and writes `rename-map.json` (old per-source display id -> new merged id), MG6 promotes the merged, renumbered set into `findings/`. MG3/MG4's gate (the workspace existing) is satisfied as a side effect of MG1. Re-run is idempotent - already-promoted findings stay put. MG2 (semantic dedup) is `kavach-chamber`, a real dispatch, not core - run it first if you want chamber-collapsed near-duplicates folded into the sources before `merge-run`. |
-     | `core:inventory` (CF1) | no CLI verb yet - enumerate `$AUDIT/findings/*/` yourself (`id`, `slug`, `dir` per entry), dispatch `kavach-reporter` to repair any finding whose `report.md` fails the vuln-report contract, then write the list as `$AUDIT/attack-surface/confirm-findings-inventory.json`. **`attack-surface/`, not `confirm-workspace/`** - CF7's own cleanup deletes `confirm-workspace/`, so a gate there is deleted by the phase that follows it. |
-     | `core:enumerate` (LS1) | no CLI verb yet - list the target's source files (reuse `$AUDIT/file-manifest.txt`, filtered to source extensions), write `$AUDIT/attack-surface/longshot-targets.json` as `{"targets": [{"id": ..., "path": ..., "status": "pending"}, ...]}`. |
+     | `core:inventory` (CF1) | `K inventory --out "$AUDIT"` - indexes `$AUDIT/findings/*/` (`id`, `slug`, `dir`, `is_aggregate`, `severity`, `has_report`) into `$AUDIT/attack-surface/confirm-findings-inventory.json`. Then dispatch `kavach-reporter` to repair any finding whose `report.md` fails the vuln-report contract. The gate lands in `attack-surface/`, **not `confirm-workspace/`** - CF7's own cleanup deletes `confirm-workspace/`, so a gate there is deleted by the phase that follows it. |
+     | `core:enumerate` (LS1) | `K enumerate --out "$AUDIT" [--limit N]` - filters `$AUDIT/file-manifest.txt` to source extensions and writes `$AUDIT/attack-surface/longshot-targets.json`. Honors `KAVACH_LONGSHOT_LIMIT`. |
 
    - **Anything else** - a subagent name (`kavach-sast`, `kavach-kb`, `kavach-chamber`, ...). Dispatch
      via `Task` with `subagent_type` set to that name and the composed prompt from step 2.

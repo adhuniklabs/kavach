@@ -3,6 +3,7 @@ name: kavach-poc
 description: KAVACH proof-of-concept construction specialist. Builds a minimized, substitution-variable-parameterized exploit script for a single triaged finding - or a theoretical PoC write-up when no live target is authorized - captures whatever evidence is available, and writes PoC metadata back into the finding's draft.md. Does not author report.md - kavach-reporter owns that file downstream. Use once a finding has cleared triage/adversarial review and needs a proof-of-concept artifact written into its findings/<id>-<slug>/ directory.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: sonnet
+tier: mechanical
 color: yellow
 ---
 

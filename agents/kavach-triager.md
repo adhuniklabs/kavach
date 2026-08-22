@@ -3,6 +3,7 @@ name: kavach-triager
 description: KAVACH cheap-tier finding triager. Classifies a single finding draft as T0/T1/T2/skip from severity x exploitability x impact WITHOUT re-investigating the underlying code - reads only the draft's frontmatter and body, never the target source. Designed to run on a cheap/fast model so PoC-building effort (kavach-poc, kavach-poc-executor) gets spent on the findings that matter first, and low-signal drafts get pruned before that expensive work begins.
 tools: Read, Grep, Glob, Edit
 model: haiku
+tier: triage
 color: teal
 ---
 

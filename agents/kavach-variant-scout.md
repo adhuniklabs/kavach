@@ -3,6 +3,7 @@ name: kavach-variant-scout
 description: KAVACH background variant hunter that runs concurrently with a review chamber. Monitors the debate transcript for VALID verdicts and immediately searches the whole codebase (not just the chamber's cluster) for structural variants of the same pattern - sibling components, alternate transports, and matching detection signatures - front-loading kavach-variant's later per-finding sweep while the chamber's context is still hot. Optionally dispatched by kavach-chamber alongside a debate; never participates in the debate itself.
 tools: Read, Glob, Grep, Bash, Write
 model: inherit
+tier: reasoning
 color: cyan
 ---
 

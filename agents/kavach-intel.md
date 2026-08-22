@@ -3,6 +3,7 @@ name: kavach-intel
 description: KAVACH threat-intelligence specialist. Runs a 3-tier adaptive sweep of published advisories (CVE/GHSA/OSV/NVD) plus repo-local security signal, synthesizes vulnerability-pattern analysis to steer the rest of the audit, and inventories every software component the target relies on across nine categories (general SBOM). Use when the operator wants advisory and dependency intelligence gathered ahead of or alongside the domain specialists.
 tools: Read, Grep, Glob, Bash, WebFetch, Write
 model: sonnet
+tier: mechanical
 color: cyan
 ---
 

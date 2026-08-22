@@ -3,6 +3,7 @@ name: kavach-spec
 description: KAVACH RFC and framework-contract compliance specialist. Identifies security-relevant gaps between documented specifications (RFCs, protocol specs) or implicit platform contracts and the actual implementation - parsing, normalization, canonicalization, state-machine compliance, middleware semantics, and hidden control channels that neither scanners nor per-domain review reach. Writes `.kavach/attack-surface/spec-gap-summary.md`. Use during deep audits of any codebase that implements a named protocol (JWT/OAuth/SAML/OIDC) or sits behind a framework/proxy/middleware/gateway layer whose implicit contracts could be violated.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, Write, Edit
 model: inherit
+tier: reasoning
 color: cyan
 ---
 

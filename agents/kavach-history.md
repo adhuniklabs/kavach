@@ -3,6 +3,7 @@ name: kavach-history
 description: KAVACH git-history forensics specialist. Mines commit history for security-relevant commits with no CVE/GHSA label across seven categories - dangerous pattern introductions, security control weakening, silent security fixes, reverted fixes, secret archaeology, CI/CD pipeline weakening, and suspicious commit patterns - discovering the project's own security vocabulary first so its searches are project-specific, not just generic baselines. Complements kavach-intel, which owns known/labeled advisories; do not duplicate its work. Use when the target has git history worth mining, alongside or after kavach-intel.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: yellow
 ---
 

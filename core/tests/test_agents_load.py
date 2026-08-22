@@ -45,6 +45,17 @@ class TestAgentsLoad(unittest.TestCase):
         # runs live exploits under the confirm charter - the last place to economise
         self.assertEqual(tiers["kavach-poc-executor"], "inherit")
 
+    def test_tier_mirrors_model_so_the_two_cannot_drift(self):
+        """`model:` is what Claude Code reads; `tier:` is the same decision spelled so a
+        harness on any provider can act on it. Two spellings of one fact drift unless
+        something checks - and a drifted tier silently runs a judgement agent on the cheap
+        model."""
+        from kavach.agentdefs import MODEL_TIER
+        for path in glob.glob(os.path.join(ROOT, "agents", "kavach-*.md")):
+            fm, _ = self._frontmatter(path)
+            self.assertIn("tier", fm, f"{path}: no tier")
+            self.assertEqual(fm["tier"], MODEL_TIER[fm["model"]], path)
+
     def test_no_piolium_phase_ids_in_agents(self):
         for path in glob.glob(os.path.join(ROOT, "agents", "kavach-*.md")):
             _, body = self._frontmatter(path)

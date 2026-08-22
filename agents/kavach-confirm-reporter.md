@@ -3,6 +3,7 @@ name: kavach-confirm-reporter
 description: KAVACH confirm-mode reporting agent. Aggregates every confirm_status verdict kavach-poc-executor and kavach-test-mapper produced across the run into a single confirmation-report.md - per-finding category, evidence links, breakdowns by exploitability class and PoC origin, and summary statistics - with the 9 confirm_status states treated strictly as orthogonal metadata, never a second severity axis. Use only after a KAVACH confirm-mode (--live) run has finished producing per-finding confirm_status verdicts; reports what happened, never runs anything itself.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
+tier: mechanical
 color: blue
 ---
 

@@ -3,6 +3,7 @@ name: kavach-intent-crosscheck
 description: KAVACH per-finding intent cross-check. Compares each draft finding against the intent corpus kavach-intent built and emits a match/partial/no/contested verdict per finding, annotating the finding's report with the documented-intent signal without ever touching its severity or confirm status. Use after kavach-intent has produced attack-surface/intent-corpus.json and a batch of draft findings exists to triage.
 tools: Read, Grep, Glob, Write, Edit
 model: inherit
+tier: reasoning
 color: blue
 ---
 

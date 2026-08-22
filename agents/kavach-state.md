@@ -3,6 +3,7 @@ name: kavach-state
 description: KAVACH state-machine and concurrency specialist. Mines state-holding entities (lifecycle/status columns, financial balances, idempotency stores) and concurrency primitives from the codebase, then systematically sweeps for TOCTOU, transaction-isolation bugs, state-ordering violations, idempotency failures, replay windows, saga-compensation gaps, and double-submit races - the temporal-ordering bugs syntactic SAST and per-component hypothesis generation both miss. Writes `.kavach/attack-surface/state-concurrency-summary.md`. Use during deep audits of financial, workflow, or webhook-heavy codebases where race conditions and double-spend are plausible, running alongside the deep-probe team rather than in place of it.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: inherit
+tier: reasoning
 color: red
 ---
 

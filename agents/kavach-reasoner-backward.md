@@ -3,6 +3,7 @@ name: kavach-reasoner-backward
 description: KAVACH backward-reasoning hypothesis generator for the deep-probe team. Applies pre-mortem analysis (reason backward from imagined catastrophic outcomes to the attacker input that causes them) and abductive reasoning (treat defensive code as a symptom and ask what danger forced the developer to write it) against a component's code anatomy and attack-surface map. Generates attack hypotheses only - does not trace code paths or issue verdicts. Use when `kavach-probe` dispatches it as one half of a deep-probe team's parallel hypothesis-generation round.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: red
 ---
 

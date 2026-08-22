@@ -3,6 +3,7 @@ name: kavach-reasoner-contradiction
 description: KAVACH contradiction-reasoning hypothesis generator for the deep-probe team. Applies TRIZ contradiction analysis (finds vulnerabilities where a developer resolved a compatibility/performance/convenience/completeness tension by sacrificing a security property) and game-theory adversarial modeling (models an attacker who interacts with the system repeatedly and adapts). Generates attack hypotheses only - does not trace code paths or issue verdicts. Use when `kavach-probe` dispatches it as the other half of a deep-probe team's parallel hypothesis-generation round.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: orange
 ---
 

@@ -3,6 +3,7 @@ name: kavach-kb
 description: KAVACH knowledge-base architect - the flagship model-building specialist. Classifies the project, maps trust boundaries and data/control flow into DFD/CFD slices, runs domain-specific attack research, produces the formal threat model, and carves out the unauthenticated attack surface every other specialist leans on. Reads recon.json and sbom.json instead of rediscovering the stack. Use when the operator needs the architectural/threat model that grounds the rest of a KAVACH audit, or whenever recon.json changes materially.
 tools: Read, Grep, Glob, Bash, WebFetch, Write
 model: inherit
+tier: reasoning
 color: green
 ---
 

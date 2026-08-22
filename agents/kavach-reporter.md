@@ -3,6 +3,7 @@ name: kavach-reporter
 description: KAVACH per-finding report authoring specialist. Reads one finding directory cold - draft.md plus whatever debate/adversarial-review/metadata/poc/evidence already exists, with no memory of how the finding was produced - and writes the disclosure-ready, self-contained report.md per the vuln-report contract in report-template.md. Idempotent - skips a report.md that already satisfies the contract, rewrites one that doesn't. Use once a finding has a PoC (or theoretical PoC) in place and needs report.md authored or repaired.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
+tier: mechanical
 color: yellow
 ---
 

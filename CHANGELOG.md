@@ -3,6 +3,51 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### The engine owns the dispatch contract
+
+`phase-prompt` used to emit one line - `Execute phase BL3 (Static Analysis & Triage).` - and the
+real instruction lived in `SKILL.md` prose. That made `SKILL.md` the spec rather than a client of
+it: any other harness had to re-read that prose, re-encode it, and drift from it silently.
+
+- **`modes.PHASE_SPECS`** - per-phase task, reference set, fan-out roster, and whether the roster is
+  sequential. `modes.AGENT_REFERENCES` carries each agent's own reading list.
+  `dispatch.phase_prompt` renders all of it, so `kavach phase-prompt` now returns a complete,
+  dispatchable prompt. A reference the machine does not have is *named as missing* rather than
+  dropped - an agent is never left assuming it was given something it was not.
+- **`kavach plan --json`** - the whole dispatch plan for every actionable phase: roster, 1-based
+  index, result path, references, gate artifacts, prereqs, `sequential`. A driver needs nothing
+  from `modes.py`.
+- **`kavach agents [--json]`** - the roster as data. Each agent gains a provider-neutral
+  **`tier:`** (`reasoning` / `mechanical` / `triage`) beside `model:`, which stays for Claude Code.
+  `test_agents_load` fails if the two spellings drift.
+- **`kavach slice <phase> --agent A --index i`** - that domain's leads out of `findings.json` into
+  `runs/<phase>/slices/`. The eight BL3/DP4 hunters were each sent the whole finding set, so a
+  300-row sweep was paid for eight times. The slice also states how many findings belong to other
+  domains, because a hunter that believes its slice is everything reports coverage it does not have.
+- **`kavach inventory`** (CF1) and **`kavach enumerate`** (LS1) - the two phases whose `core:` verb
+  did not exist, so `SKILL.md` told every harness to write the same loop by hand.
+
+### Observability and spend
+
+- **`.kavach/events.jsonl`** - one JSON object per engine decision, appended at the audit root and
+  durable across `cleanup`. Progress was only derivable by polling gate-artifact mtimes; nothing
+  recorded why a phase re-ran or what a budget check decided. `kavach events [--since N]` replays
+  it. Single `O_APPEND` writes capped below `PIPE_BUF`, so concurrent phases interleave whole lines.
+- **Spend in the ledger** - `kavach budget charge` takes `--tokens-in`, `--tokens-out` and
+  `--cost-usd`; `budget show` reports totals and per-phase spend. `--max-cost-usd` is a third
+  ceiling that sheds like wall clock, with the reason `cost ceiling` reaching the report's *Limits*
+  section. The engine never calls a model, so spend is only as real as the harness reports.
+- Ledgers written before these keys existed backfill on read, so a resumed audit accounts the same
+  as a fresh one.
+
+### Fixed
+
+- `paths.py` resolves `references/` and `agents/` across all three install shapes (repo checkout,
+  `install.sh`, bare pip), with `KAVACH_REFERENCES_DIR` / `KAVACH_AGENTS_DIR` overrides.
+- Slicing matches merge-aliased sources (`a:trivy+b:trivy`), which a whole-string comparison misses.
+
 ## [0.1.0] - 2026-08-21
 
 First public release.

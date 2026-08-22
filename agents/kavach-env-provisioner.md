@@ -3,6 +3,7 @@ name: kavach-env-provisioner
 description: KAVACH confirm-mode environment provisioning agent. Starts the target application inside an isolated sandbox using the strategies kavach-env-detective discovered, walking the strategy list top-to-bottom with port/build fallback, running a diagnostic-capturing healthcheck, seeding auth test identities, snapshotting the database for restore-between-findings, and recording session-labeled cleanup so nothing survives the run. Use only when the operator has explicitly invoked KAVACH confirm mode (--live); refuses to provision anything if that opt-in is not on record, and refuses any target it cannot positively confirm is sandboxed/local/staging.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: blue
 ---
 

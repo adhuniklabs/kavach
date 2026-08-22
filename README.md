@@ -109,6 +109,23 @@ PYTHONPATH=. python3 -m kavach gate                 # CI exit code
 PYTHONPATH=. python3 -m kavach corpus               # self-validation
 ```
 
+### Driving it from your own harness
+
+The engine plans and renders; it never calls a model. Everything a driver needs to dispatch is a
+verb, so nothing has to be re-read out of `SKILL.md` prose:
+
+```bash
+kavach plan --mode balanced --json --target .    # roster, indices, result paths, gates
+kavach phase-prompt BL3 --mode balanced --target . --agent kavach-sast --index 1
+kavach slice BL3 --agent kavach-sast --index 1   # that domain's leads, not all 300 rows
+kavach agents --json                             # tools + tier per agent (reasoning|mechanical|triage)
+kavach budget charge --phase BL3 -n 8 --cost-usd 0.42   # spend, if your harness measures it
+kavach events                                    # the run log, one JSON object per line
+```
+
+`tier:` is `model:` spelled provider-neutrally, so a non-Claude harness can route each agent without
+knowing Anthropic's model names. See [`docs/orchestration.md`](./docs/orchestration.md).
+
 Or `pip install -e ./core` → `kavach scan .`. **PDF is an optional extra:**
 `pip install 'kavach-audit[report]'` adds `reportlab` (pure Python, no system libraries). Without it
 `md`/`json`/`sarif` are unaffected, `html` substitutes a table per figure, and `pdf` exits with the

@@ -15,7 +15,7 @@ from filelock import FileLock, Timeout
 
 TRANSIENT = ("tmp", "findings-draft", "confirm-workspace")
 DURABLE = ("audit-state.json", "recon.json", "file-manifest.txt", "sweep-summary.json",
-           "findings.json", "controls.json", "attack-surface", "findings",
+           "findings.json", "controls.json", "events.jsonl", "attack-surface", "findings",
            "findings-deferred", "findings-stale", "reports", "runs",
            "final-audit-report.md", "report.json",
            "report.sarif", "confirmation-report.md", "reinvest-report.md")

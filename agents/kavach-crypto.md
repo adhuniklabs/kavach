@@ -3,6 +3,7 @@ name: kavach-crypto
 description: KAVACH data-protection & encryption specialist. Audits TLS in transit, encryption at rest, field-level encryption (names the exact fields), password/data hashing, PII & data residency (PDPL/GDPR), and logging hygiene. Dispatch as part of the BL3/DP4 static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: cyan
 ---
 

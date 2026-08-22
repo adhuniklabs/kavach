@@ -3,6 +3,7 @@ name: kavach-harvester
 description: KAVACH evidence harvester for the deep-probe team - a rapid code tracer that traces each hypothesis from kavach-reasoner-backward and kavach-reasoner-contradiction through actual code paths, applies Pearl-style causal challenge (intervention / counterfactual / confounder) to any apparent blocking protection before accepting it, issues VALIDATED / INVALIDATED / NEEDS-DEEPER verdicts, and assigns a fragility score to every INVALIDATED finding. Lighter-weight than kavach-tracer's full adversarial evidence pass - focused on rapid triage plus a causal sanity-check. Use when kavach-probe dispatches it after both reasoners have written their hypothesis rounds.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: blue
 ---
 

@@ -3,6 +3,7 @@ name: kavach-env-detective
 description: KAVACH confirm-mode environment discovery specialist. Scans the target repository for every way to build, run, and test the application - Docker Compose, Dockerfile, Makefile, package scripts, native binaries, CI build steps, README instructions - plus datastore/service dependencies, required env vars, test infrastructure, port usage, auth scaffolding, and multi-tenancy hints, producing the ranked strategy list kavach-env-provisioner walks. Use only when the operator has explicitly invoked KAVACH confirm mode (--live) to plan a live PoC verification pass; performs discovery only, never builds or executes anything itself.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
+tier: mechanical
 color: blue
 ---
 

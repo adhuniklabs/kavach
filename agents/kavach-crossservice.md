@@ -3,6 +3,7 @@ name: kavach-crossservice
 description: KAVACH cross-service taint-propagation specialist. Stitches inter-component data flows (HTTP/gRPC/queues/IPC/shared-DB writes) into a single edge graph, then propagates taint across service boundaries that single-codebase static analysis cannot follow - catching sanitization-at-boundary gaps, transitive-trust violations, write-driven injection through shared storage, and internal-only endpoints that turn out to be externally reachable. Writes `.kavach/attack-surface/cross-service-edges.json` and `.md`. Clean no-op on single-service projects. Use during deep audits of any codebase with more than one deployable service/process/component.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: inherit
+tier: reasoning
 color: orange
 ---
 

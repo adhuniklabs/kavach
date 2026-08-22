@@ -29,12 +29,20 @@ import subprocess
 import sys
 import time
 
-from . import __version__, flags
+from . import __version__, events, flags
 from .finding import Finding, dump_findings, load_findings
 from .recon import run_recon
 from .render import ReportlabMissing, render as render_report
 from .score import exit_code, gate as run_gate
 from .sweep import run_sweep
+
+
+# What longshot mode considers an anchor worth a hail-mary hunt. Deliberately source-only:
+# a swarm pointed at lockfiles and fixtures spends its whole budget before reaching code.
+SOURCE_EXTENSIONS = (
+    ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rb", ".php", ".java", ".kt", ".cs",
+    ".rs", ".swift", ".scala", ".c", ".cc", ".cpp", ".h", ".hpp", ".vue", ".svelte",
+)
 
 
 def _log(msg: str) -> None:
@@ -289,16 +297,24 @@ def cmd_budget(args) -> int:
         decision = budget.check(out, audit_id, args.phase, args.planned)
         print(json.dumps({"allowed": decision.allowed, "dropped": decision.dropped,
                           "reason": decision.reason}, indent=2))
+        events.emit(out, "budget_check", phase=args.phase, planned=args.planned,
+                    allowed=decision.allowed, dropped=decision.dropped, reason=decision.reason)
         _log(f"KAVACH budget check {args.phase} → {decision.allowed}/{args.planned} allowed "
              f"({decision.reason})")
         return 0 if decision.allowed == args.planned else 7
     if args.count is None:
         _log("KAVACH budget charge → -n N is required")
         return 5
-    ledger = budget.charge(out, audit_id, args.phase, args.count)
+    ledger = budget.charge(out, audit_id, args.phase, args.count,
+                           tokens_in=args.tokens_in, tokens_out=args.tokens_out,
+                           cost_usd=args.cost_usd)
     print(json.dumps(ledger, indent=2))
+    events.emit(out, "budget_charge", phase=args.phase, n=args.count,
+                tokens_in=args.tokens_in, tokens_out=args.tokens_out,
+                cost_usd=args.cost_usd, total_cost_usd=ledger["cost_usd"])
     _log(f"KAVACH budget charge {args.phase} +{args.count} → {ledger['dispatches']} "
-         f"dispatch(es) spent of {ledger['max_dispatches'] or 'unlimited'}")
+         f"dispatch(es) spent of {ledger['max_dispatches'] or 'unlimited'}"
+         + (f" · ${ledger['cost_usd']:.4f}" if ledger["cost_usd"] else ""))
     return 0
 
 
@@ -398,10 +414,15 @@ def cmd_state(args) -> int:
                                repository=getattr(args, "repository", "") or "")
         ledger = budget_mod.init_budget(out, run.audit_id, args.mode,
                                         max_dispatches=args.budget,
-                                        max_wall_seconds=args.max_wall_seconds)
+                                        max_wall_seconds=args.max_wall_seconds,
+                                        max_cost_usd=args.max_cost_usd)
+        events.emit(out, "audit_start", audit_id=run.audit_id, mode=args.mode,
+                    budget=ledger["max_dispatches"], wall=ledger["max_wall_seconds"],
+                    max_cost_usd=ledger["max_cost_usd"])
         _log(f"KAVACH state → new {args.mode} audit {run.audit_id}")
         _log(f"  budget: {ledger['max_dispatches'] or 'unlimited'} dispatch(es) · "
-             f"{ledger['max_wall_seconds'] or 'unlimited'} wall second(s)")
+             f"{ledger['max_wall_seconds'] or 'unlimited'} wall second(s) · "
+             f"{('$' + format(ledger['max_cost_usd'], '.2f')) if ledger['max_cost_usd'] else 'unlimited'} spend")
         return 0
     if args.state_cmd == "complete":
         commit = args.commit or _git_head()
@@ -411,6 +432,7 @@ def cmd_state(args) -> int:
             return 5
         baseline = _snapshot_findings_baseline(out, run.commit)
         note = f"baseline {os.path.basename(baseline)}" if baseline else "no baseline snapshotted"
+        events.emit(out, "audit_complete", audit_id=run.audit_id, commit=run.commit)
         _log(f"KAVACH state complete → {run.audit_id} @ {run.commit or 'no-git'} · {note}")
         return 0
     run = state.latest_audit(out)
@@ -448,20 +470,120 @@ def _snapshot_findings_baseline(out: str, commit: str | None) -> str | None:
 
 
 def cmd_plan(args) -> int:
-    from . import runner
+    from . import dispatch, runner
     out = _out_dir(args)
-    for phase in runner.next_actionable(out, args.mode):
-        print(phase)
+    phases = runner.next_actionable(out, args.mode)
+    if not args.json:
+        for phase in phases:
+            print(phase)
+        return 0
+    print(json.dumps({
+        "mode": args.mode,
+        "audit_dir": out,
+        "target": os.path.abspath(args.target),
+        "actionable": [dispatch.dispatch_plan(args.mode, p, out, args.target) for p in phases],
+    }, indent=2))
     return 0
 
 
 def cmd_phase_prompt(args) -> int:
-    from . import dispatch, modes
+    from . import dispatch
     out = _out_dir(args)
-    body = f"Execute phase {args.phase} ({modes.PHASE_LABELS.get(args.phase, args.phase)})."
-    print(dispatch.compose_prompt(args.mode, args.phase, body, out, args.target,
-                                  modes.gate_for(args.phase),
-                                  agent=args.agent, index=args.index))
+    print(dispatch.phase_prompt(args.mode, args.phase, out, args.target,
+                                agent=args.agent, index=args.index))
+    return 0
+
+
+def cmd_agents(args) -> int:
+    from . import agentdefs, paths
+    base = paths.agents_dir()
+    if base is None:
+        _log("KAVACH agents → no agents/ roster found; set KAVACH_AGENTS_DIR")
+        return 5
+    roster = agentdefs.load_all(base)
+    if args.name:
+        agent = roster.get(args.name)
+        if agent is None:
+            _log(f"KAVACH agents → no agent named {args.name}")
+            return 5
+        print(json.dumps(agent.as_dict(with_body=args.with_body), indent=2))
+        return 0
+    if args.json:
+        print(json.dumps({"dir": base,
+                          "agents": [a.as_dict() for a in roster.values()]}, indent=2))
+        return 0
+    for a in roster.values():
+        print(f"{a.name:32} {a.tier:11} {','.join(a.tools)}")
+    return 0
+
+
+def cmd_slice(args) -> int:
+    from . import slicing
+    out = _out_dir(args)
+    result = slicing.write_slice(out, args.phase, args.agent, index=args.index)
+    print(json.dumps(result, indent=2))
+    _log(f"KAVACH slice {args.phase}/{args.agent} → {result['included']} lead(s), "
+         f"{result['excluded']} left to other domains")
+    return 0
+
+
+def cmd_events(args) -> int:
+    from . import events as events_mod
+    out = _out_dir(args)
+    for record in events_mod.read(out, since=args.since):
+        print(json.dumps(record))
+    return 0
+
+
+def cmd_inventory(args) -> int:
+    """CF1. Was 'enumerate findings/ yourself' in SKILL.md, so every harness wrote the
+    same loop - and wrote it to confirm-workspace/, which CF7 then deletes."""
+    out = _out_dir(args)
+    entries = []
+    for path in sorted(glob.glob(os.path.join(out, "findings", "*"))):
+        if not os.path.isdir(path):
+            continue
+        display_id = os.path.basename(path).split("-", 1)[0]
+        meta_path = os.path.join(path, "metadata.json")
+        meta = {}
+        if os.path.exists(meta_path):
+            with open(meta_path, encoding="utf-8") as fh:
+                meta = json.load(fh)
+        entries.append({
+            "id": display_id,
+            "slug": os.path.basename(path),
+            "dir": os.path.abspath(path),
+            "is_aggregate": bool(meta.get("is_aggregate")),
+            "severity": meta.get("severity", ""),
+            "has_report": os.path.exists(os.path.join(path, "report.md")),
+        })
+    dest = _write_text(os.path.join(out, "attack-surface", "confirm-findings-inventory.json"),
+                       json.dumps({"count": len(entries), "findings": entries}, indent=2))
+    _log(f"KAVACH inventory → {len(entries)} finding dir(s) → {os.path.relpath(dest, out)}")
+    return 0
+
+
+def cmd_enumerate(args) -> int:
+    """LS1. Same story as inventory: SKILL.md said 'list the source files yourself'."""
+    from . import flags as flags_mod
+    out = _out_dir(args)
+    manifest = os.path.join(out, "file-manifest.txt")
+    if not os.path.exists(manifest):
+        _log("KAVACH enumerate → no file-manifest.txt; run `kavach recon` first")
+        return 5
+    with open(manifest, encoding="utf-8") as fh:
+        files = [line.strip() for line in fh if line.strip()]
+    exts = tuple(args.ext.split(",")) if args.ext else SOURCE_EXTENSIONS
+    targets = [f for f in files if f.endswith(exts)]
+    limit = flags_mod.read_positive_int_env("KAVACH_LONGSHOT_LIMIT", args.limit)
+    if limit and len(targets) > limit:
+        _log(f"  {len(targets)} source file(s) capped to {limit} (KAVACH_LONGSHOT_LIMIT)")
+        targets = targets[:limit]
+    dest = _write_text(
+        os.path.join(out, "attack-surface", "longshot-targets.json"),
+        json.dumps({"targets": [{"id": i, "path": p, "status": "pending"}
+                                for i, p in enumerate(targets, start=1)]}, indent=2))
+    _log(f"KAVACH enumerate → {len(targets)} target(s) → {os.path.relpath(dest, out)}")
     return 0
 
 
@@ -659,6 +781,10 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--max-wall-seconds", type=int, default=None, metavar="S",
                         help="wall-clock ceiling for this audit, 0 = unlimited "
                              "(KAVACH_MAX_WALL_SECONDS)")
+        sp.add_argument("--max-cost-usd", type=float, default=None, metavar="USD",
+                        help="spend ceiling for this audit, 0 = unlimited "
+                             "(KAVACH_MAX_COST_USD). Only a harness that reports what it "
+                             "spent can fill this in - the engine never calls a model")
 
     sp = sub.add_parser("recon", help="deterministic stack fingerprint")
     sp.add_argument("path", nargs="?", default="."); add_common(sp)
@@ -709,6 +835,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("budget", help="the dispatch/wall-clock ledger: show | check | charge")
     sp.add_argument("budget_cmd", choices=["show", "check", "charge"]); add_common(sp)
     sp.add_argument("--phase", default=None, help="phase id (check, charge)")
+    sp.add_argument("--tokens-in", type=int, default=0, help="charge: input tokens spent")
+    sp.add_argument("--tokens-out", type=int, default=0, help="charge: output tokens spent")
+    sp.add_argument("--cost-usd", type=float, default=0.0, help="charge: dollars spent")
     sp.add_argument("--planned", type=int, default=None,
                     help="how many dispatches this phase wants (check)")
     sp.add_argument("-n", "--count", type=int, default=None, dest="count",
@@ -747,7 +876,39 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("plan", help="print next-actionable phases for a mode")
     add_common(sp); sp.add_argument("--mode", required=True)
+    sp.add_argument("--json", action="store_true",
+                    help="emit the whole dispatch plan - roster, indices, result paths, "
+                         "references, gate - instead of bare phase ids")
+    sp.add_argument("--target", default=".", help="target repo root, for --json")
     sp.set_defaults(func=cmd_plan)
+
+    sp = sub.add_parser("agents", help="the agent roster as data: tools, model, tier")
+    add_common(sp)
+    sp.add_argument("name", nargs="?", help="one agent instead of the whole roster")
+    sp.add_argument("--json", action="store_true")
+    sp.add_argument("--with-body", action="store_true",
+                    help="include the agent's prompt body (implies a single --name)")
+    sp.set_defaults(func=cmd_agents)
+
+    sp = sub.add_parser("slice", help="cut one agent's lead list out of findings.json")
+    sp.add_argument("phase"); add_common(sp)
+    sp.add_argument("--agent", required=True)
+    sp.add_argument("--index", type=int, default=None)
+    sp.set_defaults(func=cmd_slice)
+
+    sp = sub.add_parser("events", help="the run's structured event log, one JSON per line")
+    add_common(sp)
+    sp.add_argument("--since", type=int, default=0, help="skip the first N lines")
+    sp.set_defaults(func=cmd_events)
+
+    sp = sub.add_parser("inventory", help="CF1: index findings/ into the confirm inventory")
+    add_common(sp); sp.set_defaults(func=cmd_inventory)
+
+    sp = sub.add_parser("enumerate", help="LS1: source files worth a hail-mary hunt")
+    add_common(sp)
+    sp.add_argument("--ext", default=None, help="comma-separated extensions to override the default set")
+    sp.add_argument("--limit", type=int, default=200, help="cap the target list (KAVACH_LONGSHOT_LIMIT)")
+    sp.set_defaults(func=cmd_enumerate)
 
     sp = sub.add_parser("phase-prompt", help="emit the composed sub-agent prompt for a phase")
     sp.add_argument("phase"); add_common(sp)
