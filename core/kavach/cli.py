@@ -409,9 +409,11 @@ def cmd_state(args) -> int:
     from . import modes, state
     out = _out_dir(args)
     if args.state_cmd == "init":
-        from . import budget as budget_mod
+        from . import budget as budget_mod, gitinfo
+        git = gitinfo.context(args.target)
         run = state.init_audit(out, args.mode, modes.phases_for(args.mode),
-                               repository=getattr(args, "repository", "") or "")
+                               repository=getattr(args, "repository", "") or "",
+                               commit=git.commit, branch=git.branch, dirty=git.dirty)
         ledger = budget_mod.init_budget(out, run.audit_id, args.mode,
                                         max_dispatches=args.budget,
                                         max_wall_seconds=args.max_wall_seconds,
@@ -419,7 +421,11 @@ def cmd_state(args) -> int:
         events.emit(out, "audit_start", audit_id=run.audit_id, mode=args.mode,
                     budget=ledger["max_dispatches"], wall=ledger["max_wall_seconds"],
                     max_cost_usd=ledger["max_cost_usd"])
-        _log(f"KAVACH state → new {args.mode} audit {run.audit_id}")
+        _log(f"KAVACH state → new {args.mode} audit {state.handle(run.audit_id)} "
+             f"({run.audit_id})")
+        _log(f"  tree: {gitinfo.short(git.commit)} on {git.branch}"
+             + ("  (uncommitted changes)" if git.dirty else "")
+             + f" · engine {run.engine_version}")
         _log(f"  budget: {ledger['max_dispatches'] or 'unlimited'} dispatch(es) · "
              f"{ledger['max_wall_seconds'] or 'unlimited'} wall second(s) · "
              f"{('$' + format(ledger['max_cost_usd'], '.2f')) if ledger['max_cost_usd'] else 'unlimited'} spend")
@@ -741,15 +747,88 @@ def _write_diff_scope(out: str, prior: str, files: list[str], in_scope: bool) ->
 
 
 def cmd_resume(args) -> int:
-    from . import runner, state
+    from . import gitinfo, runner, state
     out = _out_dir(args)
-    run = state.latest_resumable_audit(out)
+    run = state.find_audit(out, args.audit) if args.audit else state.latest_resumable_audit(out)
     if run is None:
         print("nothing to resume")
-        return 0
+        _log(f"KAVACH resume → no audit matching {args.audit!r}" if args.audit
+             else "KAVACH resume → nothing resumable in this dir")
+        return 0 if not args.audit else 5
+
+    if not state.version_compatible(run.engine_version):
+        # The phase list, the prereq graph and which artifact closes a gate can all move across
+        # a minor. Re-deriving "what is left" under a different contract than the one that wrote
+        # these artifacts would report an incoherent audit as a finished one.
+        _log(f"KAVACH resume → audit {state.handle(run.audit_id)} was produced by engine "
+             f"{run.engine_version}; this is {__version__}")
+        _log("  the phase contract may have changed. Start a fresh audit, or install "
+             f"kavach {run.engine_version} to finish this one.")
+        return 4
+
+    git = gitinfo.context(args.target)
+    drift = []
+    if run.commit and git.commit and run.commit != git.commit:
+        drift.append(f"commit {gitinfo.short(run.commit)} → {gitinfo.short(git.commit)}")
+    if run.branch not in ("nogit", git.branch):
+        drift.append(f"branch {run.branch} → {git.branch}")
+    if drift:
+        # Not fatal: re-auditing a moved tree is a legitimate thing to want. But the findings
+        # already on disk cite lines in the old one, so this cannot pass silently.
+        _log(f"KAVACH resume → the tree moved since this audit started: {', '.join(drift)}")
+        _log("  findings already on disk cite the earlier tree. "
+             "`kavach since` shows what changed.")
+
     print(run.mode)
     for phase in runner.next_actionable(out, run.mode):
         print(phase)
+    return 0
+
+
+def cmd_since(args) -> int:
+    """What has changed since the last completed audit of this repo.
+
+    The engine already keys a findings baseline by commit and can scope a diff to changed files;
+    nothing surfaced whether that was worth doing. A caller needs one cheap answer before it
+    offers a mode - re-auditing a whole repo because three files moved is the expensive mistake
+    this exists to prevent."""
+    from . import diffing, gitinfo, state
+    out = _out_dir(args)
+    repo = os.path.abspath(args.target)
+    git = gitinfo.context(repo)
+
+    last = next((a for a in reversed(state.load_state(out).audits)
+                 if a.status == state.RunStatus.COMPLETE.value), None)
+    payload: dict = {
+        "head": git.as_dict(),
+        "last_complete": None if last is None else {
+            "audit": state.handle(last.audit_id), "audit_id": last.audit_id,
+            "mode": last.mode, "commit": last.commit, "branch": last.branch,
+            "completed_at": last.completed_at, "engine_version": last.engine_version,
+        },
+    }
+    if last is None or not last.commit or not git.available:
+        payload.update(drifted=False, changed_files=[], diffable=False,
+                       reason="no completed audit with a commit to compare against")
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    changed = diffing.changed_files(repo, last.commit, git.commit)
+    payload.update(
+        drifted=last.commit != git.commit,
+        changed_files=changed,
+        # diff mode scopes to the changed set and gives up when it is too broad to be a diff.
+        diffable=diffing.scope_guard(changed),
+        baseline=diffing.baseline_path(out, last.commit),
+    )
+    print(json.dumps(payload, indent=2))
+    if not payload["drifted"]:
+        _log(f"KAVACH since → unchanged since audit {payload['last_complete']['audit']} "
+             f"at {gitinfo.short(last.commit)}")
+    else:
+        _log(f"KAVACH since → {len(changed)} file(s) changed since "
+             f"{gitinfo.short(last.commit)}"
+             + ("" if payload["diffable"] else " — too broad for diff mode"))
     return 0
 
 
@@ -924,6 +1003,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--mode", default="balanced"); sp.add_argument("--repository", default="")
     sp.add_argument("--commit", default=None,
                     help="commit to record on complete (else git rev-parse HEAD)")
+    sp.add_argument("--target", default=".", help="target repo root, for the git context")
     sp.set_defaults(func=cmd_state)
 
     sp = sub.add_parser("plan", help="print next-actionable phases for a mode")
@@ -1008,9 +1088,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--since", default=None, help="explicit prior commit (else latest complete audit)")
     sp.set_defaults(func=cmd_diff)
 
-    sp = sub.add_parser("resume", help="print the latest resumable audit's mode + next-actionable phases")
+    sp = sub.add_parser("resume", help="print a resumable audit's mode + next-actionable phases")
     add_common(sp)
+    sp.add_argument("audit", nargs="?", default=None,
+                    help="audit id or short handle; omitted, the latest resumable one")
+    sp.add_argument("--target", default=".", help="target repo root, to detect tree drift")
     sp.set_defaults(func=cmd_resume)
+
+    sp = sub.add_parser("since", help="what changed since the last completed audit")
+    add_common(sp)
+    sp.add_argument("--target", default=".", help="target repo root")
+    sp.set_defaults(func=cmd_since)
 
     sp = sub.add_parser("report-finding", help="render a per-finding report.md")
     sp.add_argument("display_id"); add_common(sp)

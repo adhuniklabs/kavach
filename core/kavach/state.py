@@ -18,6 +18,8 @@ from typing import Any, Callable
 
 from filelock import FileLock
 
+from . import __version__
+
 _TRANSIENT_ON_COMPLETE = (
     "error", "last_error", "next_retry_at", "retry_backoff_ms", "heartbeat_at",
 )
@@ -64,6 +66,11 @@ class AuditRunState:
     repository: str = ""
     history_available: bool = False
     model: str = ""
+    # What produced this audit, and what it was pointed at. Both are written at init, not
+    # only at completion: a run resumed under a different engine or against a different tree
+    # is not the same audit, and only a recorded value can catch that.
+    engine_version: str = ""
+    dirty: bool = False
     started_at: str = ""
     completed_at: str | None = None
     budget: dict[str, Any] = field(default_factory=dict)
@@ -77,6 +84,41 @@ class AuditStateFile:
 
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def handle(audit_id: str) -> str:
+    """The short, typable form of an audit id.
+
+    `audit_id` is `<iso8601>-<pid>-<uuid8>` - unique, and 36 characters with a process id in the
+    middle, which nobody is going to type. The trailing hex is already random, so the short handle
+    is derived rather than invented: no mapping table to keep, and it reads like a git sha, which
+    is a convention the reader already has.
+    """
+    return audit_id.rsplit("-", 1)[-1]
+
+
+def find_audit(audit_dir: str, ref: str) -> AuditRunState | None:
+    """Resolve a full audit id or a short handle. An ambiguous handle resolves to nothing
+    rather than to a guess - picking one of two audits for the user is worse than asking."""
+    matches = [a for a in load_state(audit_dir).audits
+               if a.audit_id == ref or handle(a.audit_id) == ref]
+    return matches[0] if len(matches) == 1 else None
+
+
+def version_compatible(recorded: str, current: str = __version__) -> bool:
+    """Whether `current` may resume an audit created by `recorded`.
+
+    Same major.minor only. On 0.x the minor is the breaking axis, and what breaks across one is
+    exactly what resume depends on: the phase list, the prereq graph, and which artifact closes a
+    gate. Resuming across it would re-derive "what is left" from a different contract than the one
+    that produced the artifacts on disk, and report the result as if it were coherent.
+
+    An audit written before this field existed records "" and is allowed through - refusing every
+    pre-existing audit would be a worse failure than the one this prevents.
+    """
+    if not recorded:
+        return True
+    return recorded.split(".")[:2] == current.split(".")[:2]
 
 
 def state_path(audit_dir: str) -> str:
@@ -149,12 +191,13 @@ def _find(f: AuditStateFile, audit_id: str) -> AuditRunState:
 
 def init_audit(audit_dir: str, mode: str, phases: list[str], *, commit: str | None = None,
                branch: str = "nogit", repository: str = "", history_available: bool = False,
-               model: str = "") -> AuditRunState:
+               model: str = "", dirty: bool = False) -> AuditRunState:
     audit_id = _now() + f"-{os.getpid()}-{uuid.uuid4().hex[:8]}"
     run = AuditRunState(
         audit_id=audit_id, mode=mode, status=RunStatus.IN_PROGRESS.value,
         commit=commit, branch=branch, repository=repository,
         history_available=history_available, model=model, started_at=_now(),
+        engine_version=__version__, dirty=dirty,
         phases={p: PhaseState() for p in phases},
     )
     mutate_state(audit_dir, lambda f: f.audits.append(run))

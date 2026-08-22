@@ -3,7 +3,39 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-08-23
+
+**Breaking for anything driving the engine.** `dispatch.ingest` returns `(written, skipped)`
+instead of a count, and `phase-prompt` now emits a complete prompt rather than a one-line body.
+An audit created by 0.1.x cannot be resumed by 0.2.x — the phase contract moved, and resume
+re-derives what is left from that contract. `kavach resume` refuses across the minor and says so
+rather than producing an incoherent report.
+
+### Versioning and the audited tree
+
+- **One version.** `kavach.__version__` is the single source; `pyproject.toml` reads it via
+  `dynamic = ["version"]`. Two copies disagreed the moment either was bumped alone, and the
+  packaged metadata is what a compatibility check reads. A test fails on a missing changelog
+  entry for the current version.
+- **Audits record the engine that made them.** `engine_version` on the audit record, set at
+  `state init`. `kavach resume` refuses an audit from an incompatible engine (same `major.minor`
+  only — on 0.x the minor is the breaking axis, and what moves across it is exactly what resume
+  depends on: the phase list, the prereq graph, and which artifact closes a gate).
+- **Audits record the tree they were pointed at.** `commit`, `branch` and `dirty` are captured at
+  `state init`, not only at completion. `complete_audit` recording the commit at the end was
+  enough to key a baseline for a later diff and not enough to notice a run resumed after a
+  checkout, a pull or a rebase — where the findings on disk cite lines in a tree that no longer
+  exists. `resume` reports the drift; it does not block, because re-auditing a moved tree is a
+  legitimate thing to want.
+- **Short handles.** `state.handle()` gives the trailing hex of an audit id — derived, not
+  invented, so there is no mapping table and it reads like a git sha. `kavach resume <handle>`
+  takes it; an ambiguous handle resolves to nothing rather than to a guess.
+- **`kavach since`** — what changed since the last completed audit: head vs the audited commit,
+  the changed file list, whether it is narrow enough for `diff` mode, and the baseline path. The
+  engine could already key a baseline by commit and scope a diff; nothing surfaced whether doing
+  so was worth it. Re-auditing a whole repo because three files moved is the expensive mistake
+  this exists to prevent.
+
 
 ### Fixed — resume safety
 
@@ -183,4 +215,5 @@ First public release.
 - Portions adapted from [piolium](https://github.com/vigolium/piolium) (MIT, © j3ssie); see
   [`NOTICE`](./NOTICE) for the itemized attribution.
 
+[0.2.0]: https://github.com/adhuniklabs/kavach/releases/tag/v0.2.0
 [0.1.0]: https://github.com/adhuniklabs/kavach/releases/tag/v0.1.0
