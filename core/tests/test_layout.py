@@ -75,7 +75,7 @@ class TestLayout(unittest.TestCase):
         path = dispatch.result_path(self.dir, "BL3", "kavach-sast", index=1)
         with open(path, "w", encoding="utf-8") as fh:
             json.dump({"findings": [f.to_dict()]}, fh)
-        self.assertEqual(dispatch.ingest(self.dir, "BL3", path), 1)
+        self.assertEqual(dispatch.ingest(self.dir, "BL3", path), (1, 0))
 
     def test_audited_root_sprawl_is_reported_not_deleted(self):
         # The four files the 2026-08-21 deep run invented at the audit root. agent-*.json

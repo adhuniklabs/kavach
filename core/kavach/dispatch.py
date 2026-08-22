@@ -9,8 +9,10 @@ from __future__ import annotations
 import glob
 import os
 import re
+import time
 import uuid
 
+import yaml
 from filelock import FileLock
 
 from . import graphindex, modes, paths, scoping
@@ -93,16 +95,79 @@ def _ingest_lock_path(audit_dir: str, phase: str) -> str:
     return os.path.join(lock_dir, f"ingest-{phase.lower()}.lock")
 
 
-def ingest(audit_dir: str, phase: str, result_path: str) -> int:
+def existing_fingerprints(audit_dir: str, phase: str) -> set[str]:
+    """Every finding this phase has already drafted, by fingerprint.
+
+    Drafts carry `kavach_id` in their frontmatter, which is the finding's fingerprint and is
+    stable across line moves - so it answers "have I already folded this in?" without a
+    second index to keep in sync.
+    """
+    seen: set[str] = set()
+    pattern = os.path.join(audit_dir, "findings-draft", f"{phase.lower()}-*.md")
+    for path in glob.glob(pattern):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read(2048)
+        except OSError:
+            continue
+        if not text.startswith("---\n"):
+            continue
+        parts = text.split("---\n", 2)
+        if len(parts) < 3:
+            continue
+        try:
+            fm = yaml.safe_load(parts[1]) or {}
+        except yaml.YAMLError:
+            continue
+        fid = fm.get("kavach_id")
+        if fid:
+            seen.add(str(fid))
+    return seen
+
+
+def quarantine(audit_dir: str, result_path: str) -> str:
+    """Move an unreadable result file out of the way and return where it went.
+
+    A dispatch killed mid-write leaves truncated JSON, and the agent writes that file, not the
+    engine - so it cannot be made atomic from here. Left in place it fails the whole phase's
+    ingest on every resume, taking the valid results with it. Moved aside, `runs/<phase>/*.json`
+    holds only readable results, "did this dispatch produce a result?" stays a plain existence
+    check, and the evidence survives under runs/, which cleanup keeps.
+    """
+    d = os.path.join(os.path.dirname(os.path.abspath(result_path)), "corrupt")
+    os.makedirs(d, exist_ok=True)
+    dest = os.path.join(d, f"{os.path.basename(result_path)}.{int(time.time())}")
+    os.replace(result_path, dest)
+    return dest
+
+
+def ingest(audit_dir: str, phase: str, result_path: str) -> tuple[int, int]:
+    """Fold one result file into drafts. Returns (written, skipped-as-already-present).
+
+    Ingest is re-run on every resume, because a phase stays actionable until its gate artifact
+    exists - so folding the same result twice is the normal case, not an error case. Numbering
+    drafts sequentially made that produce a second copy of every finding, which then reached
+    the report as inflated counts.
+    """
     findings = load_findings(result_path)
     # fan-out phases (BL3/DP4, LS2, ...) ingest several concurrent dispatches under the
     # same phase id; without a lock, two processes can read the same next-draft-number
-    # before either writes, and the second write clobbers the first's draft.
+    # before either writes, and the second write clobbers the first's draft. The same lock
+    # makes the already-drafted check safe against a concurrent ingest of a sibling result.
+    written = skipped = 0
     with FileLock(_ingest_lock_path(audit_dir, phase)):
-        start = _next_draft_number(audit_dir, phase.lower())
-        for offset, finding in enumerate(findings):
-            write_draft(audit_dir, finding, phase, start + offset)
-    return len(findings)
+        seen = existing_fingerprints(audit_dir, phase)
+        n = _next_draft_number(audit_dir, phase.lower())
+        for finding in findings:
+            fingerprint = finding.fingerprint()
+            if fingerprint in seen:
+                skipped += 1
+                continue
+            write_draft(audit_dir, finding, phase, n)
+            seen.add(fingerprint)
+            n += 1
+            written += 1
+    return written, skipped
 
 
 def _bullets(items: list[str]) -> str:
