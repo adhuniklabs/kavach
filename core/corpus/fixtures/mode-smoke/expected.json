@@ -1,0 +1,7 @@
+{
+  "description": "Tiny fixture for the per-mode smoke test - one hardcoded secret, one SQL injection",
+  "stack": {
+    "languages": ["Python"]
+  },
+  "min_secrets": 1
+}

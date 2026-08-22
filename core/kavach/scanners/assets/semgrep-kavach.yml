@@ -1,0 +1,101 @@
+# KAVACH offline semgrep ruleset - the SAST floor.
+# High-signal, dependency-free rules that fire WITHOUT the semgrep registry, so semgrep
+# never silently returns zero when `--config auto` can't reach the network. Kept small and
+# precise (low false-positive); the registry ruleset + subagents widen coverage.
+rules:
+  - id: kavach-node-tls-reject-unauthorized
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      NODE_TLS_REJECT_UNAUTHORIZED disabled - this turns off TLS certificate validation
+      process-wide, exposing every outbound HTTPS call (keys, DB, billing) to MITM.
+    metadata: {cwe: "CWE-295", owasp: "A02:2021"}
+    patterns:
+      - pattern-either:
+          - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+          - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
+  - id: kavach-node-reject-unauthorized-false
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "rejectUnauthorized:false disables TLS certificate verification for this connection."
+    metadata: {cwe: "CWE-295", owasp: "A02:2021"}
+    pattern: "rejectUnauthorized: false"
+
+  - id: kavach-node-child-process-exec
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "child_process.exec/execSync with a dynamic argument - command injection risk."
+    metadata: {cwe: "CWE-78", owasp: "A03:2021"}
+    patterns:
+      - pattern-either:
+          - pattern: $CP.exec($X, ...)
+          - pattern: $CP.execSync($X, ...)
+      - pattern-not: $CP.exec("...", ...)
+      - pattern-not: $CP.execSync("...", ...)
+
+  - id: kavach-js-eval
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "eval() on a non-literal - code injection risk."
+    metadata: {cwe: "CWE-95", owasp: "A03:2021"}
+    patterns:
+      - pattern: eval($X)
+      - pattern-not: eval("...")
+
+  - id: kavach-react-dangerously-set-inner-html
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "dangerouslySetInnerHTML - unsanitized HTML render is an XSS sink."
+    metadata: {cwe: "CWE-79", owasp: "A03:2021"}
+    pattern: dangerouslySetInnerHTML={...}
+
+  - id: kavach-response-reflects-request-header
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A request header is reflected into the response body - if this is the Cookie/Authorization
+      header it defeats httpOnly and enables token exfiltration via XSS.
+    metadata: {cwe: "CWE-200", owasp: "A01:2021"}
+    patterns:
+      - pattern-either:
+          - pattern: $REQ.headers.cookie
+          - pattern: $REQ.headers.authorization
+          - pattern: $REQ.headers.get("cookie")
+          - pattern: $REQ.headers.get("authorization")
+
+  - id: kavach-python-subprocess-shell-true
+    languages: [python]
+    severity: ERROR
+    message: "subprocess call with shell=True and a dynamic command - command injection risk."
+    metadata: {cwe: "CWE-78", owasp: "A03:2021"}
+    patterns:
+      - pattern: subprocess.$FN(..., shell=True, ...)
+      - pattern-not: subprocess.$FN("...", ..., shell=True, ...)
+
+  - id: kavach-python-eval-exec
+    languages: [python]
+    severity: ERROR
+    message: "eval()/exec() on a non-literal - code injection risk."
+    metadata: {cwe: "CWE-95", owasp: "A03:2021"}
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: exec($X)
+      - pattern-not: eval("...")
+      - pattern-not: exec("...")
+
+  - id: kavach-flask-debug-true
+    languages: [python]
+    severity: WARNING
+    message: "Flask app.run(debug=True) - the Werkzeug debugger allows RCE if reachable in prod."
+    metadata: {cwe: "CWE-489", owasp: "A05:2021"}
+    pattern: $APP.run(..., debug=True, ...)
+
+  - id: kavach-python-yaml-load
+    languages: [python]
+    severity: ERROR
+    message: "yaml.load without SafeLoader - insecure deserialization."
+    metadata: {cwe: "CWE-502", owasp: "A08:2021"}
+    patterns:
+      - pattern: yaml.load($X)

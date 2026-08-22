@@ -1,0 +1,79 @@
+KAVACH (Adhunik Kavach)
+Copyright (c) 2026 Adhunik Labs
+Licensed under the MIT License (see LICENSE).
+
+KAVACH orchestrates third-party security scanners by invoking their official
+Docker images; it does not redistribute their source. Those tools carry their
+own licenses (see skill/references/tool-research.md for the per-tool license
+notes relevant to commercial or hosted use).
+
+================================================================================
+Third-party attribution
+================================================================================
+
+Portions of KAVACH are adapted from **piolium**
+  https://github.com/vigolium/piolium  (authored by @j3ssie)
+which is distributed under the MIT License. piolium is a Pi-native repository
+security audit agent; KAVACH re-implements and adapts its architecture into a
+Claude Code skill + Python core. The piolium copyright notice and license text
+are reproduced in full below, as required by the MIT License.
+
+--------------------------------------------------------------------------------
+piolium - MIT License
+--------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 Vigolium
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+What KAVACH adapted from piolium
+--------------------------------------------------------------------------------
+
+KAVACH keeps its own original core (the six operator-nightmare kill chains and
+attack-trees, the VAPT verdict + fail-closed certification gate, CVSS severity
+chaining, the zero-input recon, the Docker-first scanner suite, and the VAJRA
+persona). The following designs are adapted from piolium and re-implemented for
+KAVACH's Claude Code skill + Python architecture:
+
+  - The multi-mode audit model and per-mode phase decomposition (KAVACH ships
+    lite / balanced / deep / diff / confirm / revisit / merge / longshot),
+    re-expressed with KAVACH phase ids.
+  - The resumable, gate-driven run-state design (audit-state.json schema, phase
+    status lifecycle, prerequisite DAG, retry/backoff bookkeeping, resume
+    selection) - re-implemented in Python.
+  - The controlled-concurrency scheduler and phase-runner design.
+  - The structured output layout: the durable attack-surface knowledge base, the
+    findings-draft -> findings/<id>-<slug>/ promotion tree (draft.md, report.md,
+    poc, evidence/), and the consolidated final report - re-skinned to KAVACH's
+    .kavach/ artifact tree.
+  - The review-chamber, deep-probe, false-positive-verification, variant-search,
+    PoC-construction, and confirmation pipelines, ported as KAVACH sub-agents
+    (agents/kavach-*.md).
+  - The per-finding disclosure-report contract and false-positive-elimination
+    gates.
+  - Companion analysis skills (skills/): CodeQL, CI/AI-agent-actions auditing,
+    threat modeling, spec-to-code compliance, variant analysis, zeroize/secret
+    -wipe auditing, and Semgrep rule authoring.
+
+Files that were ported near-verbatim carry an inline provenance note. See
+individual agents/kavach-*.md, skills/*/SKILL.md, and skill/references/*.md
+headers.

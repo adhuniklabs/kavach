@@ -1,0 +1,26 @@
+# KAVACH audit artifacts (generated per-run)
+.kavach/
+KAVACH_SECURITY_REPORT.md
+*.sarif
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Internal design records / implementation plans (not part of the shipped docs)
+docs/superpowers/

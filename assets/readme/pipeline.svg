@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="352" viewBox="0 0 1200 352"
+     role="img" aria-labelledby="t d">
+  <title id="t">KAVACH's six-stage flow and the artifact that proves each stage complete</title>
+  <desc id="d">Six numbered stages, each with the artifact that gates it: 1 recon writes recon.json, 2 sweep writes sweep-summary, 3 drafts write findings-draft, 4 chamber writes chamber-summary, 5 promote writes findings, 6 report writes reports. A phase is done only when its artifact is on disk, so an interrupted run resumes from real progress.</desc>
+
+  <rect width="1200" height="352" rx="18" fill="#0b0b0c"/>
+  <rect x="0.6" y="0.6" width="1198.8" height="350.8" rx="17.4" fill="none" stroke="#26262b" stroke-width="1.2"/>
+
+  <text x="90" y="54" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="21"
+        letter-spacing="2.2" fill="#c9a227">ONE DATA FLOW - SHARED BY ALL EIGHT MODES</text>
+
+  <g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
+    <!-- row 1 -->
+    <g transform="translate(90 128)">
+      <text font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="26" fill="#8f7a2e">1</text>
+      <text x="36" font-size="34" font-weight="600" fill="#f2efe9">recon</text>
+      <text y="38" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24" fill="#c9a227">recon.json</text>
+    </g>
+    <g transform="translate(450 128)">
+      <text font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="26" fill="#8f7a2e">2</text>
+      <text x="36" font-size="34" font-weight="600" fill="#f2efe9">sweep</text>
+      <text y="38" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24" fill="#c9a227">sweep-summary</text>
+    </g>
+    <g transform="translate(810 128)">
+      <text font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="26" fill="#8f7a2e">3</text>
+      <text x="36" font-size="34" font-weight="600" fill="#f2efe9">drafts</text>
+      <text y="38" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24" fill="#c9a227">findings-draft/</text>
+    </g>
+
+    <!-- row 2 -->
+    <g transform="translate(90 236)">
+      <text font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="26" fill="#8f7a2e">4</text>
+      <text x="36" font-size="34" font-weight="600" fill="#f2efe9">chamber</text>
+      <text y="38" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24" fill="#c9a227">chamber-summary</text>
+    </g>
+    <g transform="translate(450 236)">
+      <text font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="26" fill="#8f7a2e">5</text>
+      <text x="36" font-size="34" font-weight="600" fill="#f2efe9">promote</text>
+      <text y="38" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24" fill="#c9a227">findings/</text>
+    </g>
+    <g transform="translate(810 236)">
+      <text font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="26" fill="#8f7a2e">6</text>
+      <text x="36" font-size="34" font-weight="600" fill="#f2efe9">report</text>
+      <text y="38" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24" fill="#c9a227">reports/</text>
+    </g>
+  </g>
+
+  <line x1="90" y1="300" x2="1110" y2="300" stroke="#26262b" stroke-width="1.25"/>
+  <text x="90" y="334" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="22"
+        fill="#86827c">A phase is done only when its artifact is on disk.</text>
+</svg>

@@ -1,0 +1,10 @@
+{
+  "description": "Node/Express app with hardcoded keys, unauth LLM proxy, IDOR, client-trusted price",
+  "stack": {
+    "frameworks": ["Express"],
+    "llm_providers": ["Anthropic"],
+    "payment_processors": ["Stripe"],
+    "auth": ["jsonwebtoken"]
+  },
+  "min_secrets": 3
+}

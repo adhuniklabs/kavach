@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="326" viewBox="0 0 1200 326"
+     role="img" aria-labelledby="t d">
+  <title id="t">A scanner row is not a finding - 310 raw findings collapse to 57 promoted directories</title>
+  <desc id="d">On a real audit, a raw sweep of 310 findings breaks down into 141 dependency rows, 72 IaC rows and 97 agent-reasoned findings. Promoting on class and severity yields 57 directories: 12 Critical, 43 High and 2 aggregate directories holding the 213 rolled-up scanner rows.</desc>
+
+  <rect width="1200" height="326" rx="18" fill="#0b0b0c"/>
+  <rect x="0.6" y="0.6" width="1198.8" height="324.8" rx="17.4" fill="none" stroke="#26262b" stroke-width="1.2"/>
+
+  <text x="90" y="54" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="21"
+        letter-spacing="2.2" fill="#c9a227">A SCANNER ROW IS NOT A FINDING</text>
+
+  <!-- before -->
+  <text x="90" y="112" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="22" fill="#86827c">raw sweep</text>
+  <text x="90" y="150" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="38" font-weight="700" fill="#f2efe9">310</text>
+
+  <g transform="translate(280 88)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24">
+    <rect width="368" height="48" rx="6" fill="#232025" stroke="#3a3540" stroke-width="1.4"/>
+    <text x="20" y="31" fill="#a9a29b">141 dependency</text>
+    <rect x="378" width="188" height="48" rx="6" fill="#1d2025" stroke="#333a40" stroke-width="1.4"/>
+    <text x="398" y="31" fill="#a9a29b">72 iac</text>
+    <rect x="576" width="253" height="48" rx="6" fill="#2b2410" stroke="#7d6a22" stroke-width="1.4"/>
+    <text x="596" y="31" fill="#e0bd53">97 reasoned</text>
+  </g>
+
+  <!-- transform -->
+  <g transform="translate(280 158)">
+    <path d="M10 0 L10 32 M3 25 L10 33 L17 25" fill="none" stroke="#8f7a2e" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="38" y="26" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="22" fill="#86827c">promote on class + severity</text>
+  </g>
+
+  <!-- after -->
+  <text x="90" y="238" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="22" fill="#86827c">findings/</text>
+  <text x="90" y="276" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="38" font-weight="700" fill="#f2efe9">57</text>
+
+  <g transform="translate(280 214)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="24">
+    <rect width="31" height="48" rx="6" fill="#2a1210" stroke="#7d2f26" stroke-width="1.4"/>
+    <rect x="37" width="112" height="48" rx="6" fill="#2a1c10" stroke="#8a5a22" stroke-width="1.4"/>
+    <rect x="155" width="8" height="48" rx="6" fill="#232014" stroke="#6f6427" stroke-width="1.4"/>
+    <text x="191" y="31" fill="#a9a29b">12 <tspan fill="#e0685c">C</tspan> · 43 <tspan fill="#dc9b4e">H</tspan> · 2 <tspan fill="#cbbf58">G</tspan> aggregates</text>
+  </g>
+
+  <line x1="90" y1="288" x2="1110" y2="288" stroke="#26262b" stroke-width="1.25"/>
+  <text x="90" y="312" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="22" fill="#86827c">213 scanner rows rolled up. Nothing dropped.</text>
+</svg>

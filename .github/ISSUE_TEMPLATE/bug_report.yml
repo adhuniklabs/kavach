@@ -1,0 +1,58 @@
+name: Bug report
+description: Something in Adhunik Kavach behaves incorrectly (a crash, a wrong finding, a bad report).
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For **security vulnerabilities**, do not file here - see
+        [SECURITY.md](https://github.com/adhuniklabs/kavach/blob/main/SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What went wrong, and what you expected instead.
+      placeholder: "`kavach sweep` crashed / a real key was missed / a finding is a false positive…"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact command(s), and the stack/language of the target if relevant.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - core / CLI (recon, sweep, scoring, render)
+        - a specific scanner adapter
+        - the skill / a subagent
+        - install.sh
+        - other / not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Output of `kavach --version`, or the commit SHA.
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, and whether Docker is available.
+      placeholder: "macOS 15 · Python 3.11 · Docker running"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Paste the error / the offending finding. Redact any real secrets.
+      render: shell

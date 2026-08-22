@@ -1,0 +1,36 @@
+name: Feature / scanner request
+description: Propose a capability, or a new security tool to integrate.
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of request
+      options:
+        - New scanner adapter (a tool to integrate)
+        - New audit coverage (a threat/domain to detect)
+        - CLI / core capability
+        - Skill / subagent improvement
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the gap
+      description: What can't Adhunik Kavach catch or do today, and why does it matter?
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Tool (if proposing a scanner)
+      description: Name + repo/homepage. Note if it's OSS, has a Docker image, emits JSON/SARIF, and any license caveats.
+      placeholder: "e.g. OWASP dep-scan - https://github.com/owasp-dep-scan/dep-scan (Apache-2.0, Docker, JSON)"
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: How should it work? Which subagent/domain does it feed?
+    validations:
+      required: true

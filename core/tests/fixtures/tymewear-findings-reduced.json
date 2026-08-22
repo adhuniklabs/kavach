@@ -1,0 +1,1331 @@
+{
+  "meta": {
+    "note": "Reduced stand-in for a real deep-mode findings.json. Row shape and class mix are faithful; every package, path, and title is synthetic. Exercises every triage.classify rule, including the source-set, category-prefix, and rule_id-prefix derivations, the reasoned-beats-dependency precedence, and the trivy secret row whose source belongs to the dependency set.",
+    "mode": "deep"
+  },
+  "findings": [
+    {
+      "title": "requests 2.28.1: CVE-2024-35195",
+      "severity": "high",
+      "category": "A06:Vulnerable-Components",
+      "source": "trivy",
+      "locations": [
+        {
+          "file": "requirements.txt",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "requests 2.28.1: CVE-2024-35195 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "CVE-2024-35195",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-1525fba58a"
+    },
+    {
+      "title": "urllib3 1.26.12: CVE-2023-45803",
+      "severity": "medium",
+      "category": "A06:Vulnerable-Components",
+      "source": "trivy",
+      "locations": [
+        {
+          "file": "requirements.txt",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "urllib3 1.26.12: CVE-2023-45803 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "CVE-2023-45803",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-963039fef6"
+    },
+    {
+      "title": "idna 3.3: CVE-2024-3651",
+      "severity": "critical",
+      "category": "A06:Vulnerable-Components",
+      "source": "trivy",
+      "locations": [
+        {
+          "file": "requirements.txt",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "idna 3.3: CVE-2024-3651 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "CVE-2024-3651",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-6be22afc57"
+    },
+    {
+      "title": "setuptools 59.6.0: CVE-2022-40897",
+      "severity": "low",
+      "category": "A06:Vulnerable-Components",
+      "source": "trivy",
+      "locations": [
+        {
+          "file": "requirements.txt",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "setuptools 59.6.0: CVE-2022-40897 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 3.1,
+      "rule_id": "CVE-2022-40897",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-123f689d9f"
+    },
+    {
+      "title": "gunicorn 20.1.0: GHSA-h4gh-qq45-vh27",
+      "severity": "high",
+      "category": "A06:Vulnerable-Components",
+      "source": "pip-audit",
+      "locations": [
+        {
+          "file": "requirements/pyproject",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "gunicorn 20.1.0: GHSA-h4gh-qq45-vh27 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "GHSA-h4gh-qq45-vh27",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-6b555af9fa"
+    },
+    {
+      "title": "jinja2 3.1.2: GHSA-5rjg-fvgr-3xxf",
+      "severity": "medium",
+      "category": "A06:Vulnerable-Components",
+      "source": "pip-audit",
+      "locations": [
+        {
+          "file": "requirements/pyproject",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "jinja2 3.1.2: GHSA-5rjg-fvgr-3xxf - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "GHSA-5rjg-fvgr-3xxf",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-0d669e9df6"
+    },
+    {
+      "title": "Prototype pollution in lodash",
+      "severity": "high",
+      "category": "A06:Vulnerable-Components",
+      "source": "npm-audit",
+      "locations": [
+        {
+          "file": "package-lock.json",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Prototype pollution in lodash - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "lodash",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-90dcb23982"
+    },
+    {
+      "title": "ReDoS in semver",
+      "severity": "medium",
+      "category": "A06:Vulnerable-Components",
+      "source": "npm-audit",
+      "locations": [
+        {
+          "file": "package-lock.json",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "ReDoS in semver - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "semver",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-d4f25b60a8"
+    },
+    {
+      "title": "protobuf: OSV-2023-1114",
+      "severity": "high",
+      "category": "A06:Vulnerable-Components",
+      "source": "osv-scanner",
+      "locations": [
+        {
+          "file": "go.sum",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "protobuf: OSV-2023-1114 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "OSV-2023-1114",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-6daaad7be3"
+    },
+    {
+      "title": "grpc-go: GHSA-m425-mq94-257g",
+      "severity": "critical",
+      "category": "A06:Vulnerable-Components",
+      "source": "osv-scanner",
+      "locations": [
+        {
+          "file": "go.sum",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "grpc-go: GHSA-m425-mq94-257g - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "GHSA-m425-mq94-257g",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-cd6b6182dd"
+    },
+    {
+      "title": "guarddog flagged 'colourama'",
+      "severity": "high",
+      "category": "Supply-Chain-Malware",
+      "source": "guarddog",
+      "locations": [
+        {
+          "file": "package.json",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "guarddog flagged 'colourama' - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "exfiltrate-sensitive-data",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-67aa925269"
+    },
+    {
+      "title": "lodash 4.17.20: CVE-2021-23337",
+      "severity": "medium",
+      "category": "A06:Vulnerable-Components",
+      "source": "deps",
+      "locations": [
+        {
+          "file": "package.json",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "lodash 4.17.20: CVE-2021-23337 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "CVE-2021-23337",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-b8cbde2a88"
+    },
+    {
+      "title": "Outdated transitive package tree",
+      "severity": "high",
+      "category": "A06:Vulnerable-Components",
+      "source": "unknown-tool",
+      "locations": [
+        {
+          "file": "yarn.lock",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Outdated transitive package tree - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-1305807b77"
+    },
+    {
+      "title": "Vendored copy of a known-bad release",
+      "severity": "medium",
+      "category": "Dependency-Risk",
+      "source": "some-linter",
+      "locations": [
+        {
+          "file": "vendor/lodash.js",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Vendored copy of a known-bad release - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "CVE-2020-8203",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-19702dd64b"
+    },
+    {
+      "title": "Vendored prototype-pollution sink",
+      "severity": "medium",
+      "category": "Dependency-Risk",
+      "source": "some-linter",
+      "locations": [
+        {
+          "file": "vendor/lodash.js",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Vendored prototype-pollution sink - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "GHSA-jf85-cpcp-j695",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-dc38d5b04a"
+    },
+    {
+      "title": "Vendored ancient tarball",
+      "severity": "low",
+      "category": "Dependency-Risk",
+      "source": "some-linter",
+      "locations": [
+        {
+          "file": "vendor/old.tgz",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Vendored ancient tarball - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 3.1,
+      "rule_id": "OSV-2022-999",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-4e1da1cf8b"
+    },
+    {
+      "title": "stdlib go1.21.0: CVE-2024-24790",
+      "severity": "critical",
+      "category": "A06:Vulnerable-Components",
+      "source": "trivy",
+      "locations": [
+        {
+          "file": "go.mod",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "stdlib go1.21.0: CVE-2024-24790 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "CVE-2024-24790",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-0cbb175b51"
+    },
+    {
+      "title": "golang.org/x/net 0.7.0: CVE-2023-44487",
+      "severity": "high",
+      "category": "A06:Vulnerable-Components",
+      "source": "trivy",
+      "locations": [
+        {
+          "file": "go.mod",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "golang.org/x/net 0.7.0: CVE-2023-44487 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "CVE-2023-44487",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-3524e0921e"
+    },
+    {
+      "title": "S3 bucket has no access logging",
+      "severity": "medium",
+      "category": "A05:Misconfiguration",
+      "source": "checkov",
+      "locations": [
+        {
+          "file": "infra/s3.tf",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "S3 bucket has no access logging - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "CKV_AWS_18",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-59caaafed7"
+    },
+    {
+      "title": "S3 bucket versioning disabled",
+      "severity": "medium",
+      "category": "A05:Misconfiguration",
+      "source": "checkov",
+      "locations": [
+        {
+          "file": "infra/s3.tf",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "S3 bucket versioning disabled - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "CKV_AWS_21",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-ea71555b35"
+    },
+    {
+      "title": "Container runs as root",
+      "severity": "high",
+      "category": "A05:Misconfiguration",
+      "source": "checkov",
+      "locations": [
+        {
+          "file": "k8s/api-deploy.yaml",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Container runs as root - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "CKV_K8S_23",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-91d1672fb6"
+    },
+    {
+      "title": "Security group rule has no description",
+      "severity": "low",
+      "category": "A05:Misconfiguration",
+      "source": "checkov",
+      "locations": [
+        {
+          "file": "infra/sg.tf",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Security group rule has no description - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 3.1,
+      "rule_id": "CKV_AWS_23",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-49910e194b"
+    },
+    {
+      "title": "RDS instance is publicly accessible",
+      "severity": "high",
+      "category": "A05:Misconfiguration",
+      "source": "kics",
+      "locations": [
+        {
+          "file": "infra/rds.tf",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "RDS instance is publicly accessible - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "8c8e5c1a",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-490c88c2e1"
+    },
+    {
+      "title": "Missing encryption at rest",
+      "severity": "medium",
+      "category": "A05:Misconfiguration",
+      "source": "kics",
+      "locations": [
+        {
+          "file": "infra/rds.tf",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Missing encryption at rest - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "b6d0a0a1",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-ba38981a90"
+    },
+    {
+      "title": "apt-get install without version pin",
+      "severity": "medium",
+      "category": "A05:Misconfiguration",
+      "source": "hadolint",
+      "locations": [
+        {
+          "file": "Dockerfile",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "apt-get install without version pin - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "DL3008",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-8e5cb3a0a2"
+    },
+    {
+      "title": "Last USER should not be root",
+      "severity": "medium",
+      "category": "A05:Misconfiguration",
+      "source": "hadolint",
+      "locations": [
+        {
+          "file": "Dockerfile",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Last USER should not be root - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "DL3002",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-1c1fae47a9"
+    },
+    {
+      "title": "Compose service binds 0.0.0.0",
+      "severity": "medium",
+      "category": "A05:Misconfiguration",
+      "source": "iac",
+      "locations": [
+        {
+          "file": "docker-compose.yml",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Compose service binds 0.0.0.0 - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-87a246b8b0"
+    },
+    {
+      "title": "S3 bucket allows public ACL",
+      "severity": "medium",
+      "category": "A05:Misconfiguration",
+      "source": "unknown-tool",
+      "locations": [
+        {
+          "file": "infra/s3.tf",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "S3 bucket allows public ACL - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "CKV2_AWS_6",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-f10ce0ca4d"
+    },
+    {
+      "title": "Bucket is not encrypted",
+      "severity": "high",
+      "category": "A05:Misconfiguration",
+      "source": "unknown-tool",
+      "locations": [
+        {
+          "file": "infra/s3.tf",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Bucket is not encrypted - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "AVD-AWS-0088",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-fdd16dd9d9"
+    },
+    {
+      "title": "Multiple consecutive RUN instructions",
+      "severity": "low",
+      "category": "A05:Misconfiguration",
+      "source": "unknown-tool",
+      "locations": [
+        {
+          "file": "Dockerfile",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Multiple consecutive RUN instructions - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 3.1,
+      "rule_id": "DL3059",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-b0dbcc11d9"
+    },
+    {
+      "title": "Raw SQL built from request args",
+      "severity": "critical",
+      "category": "A03:Injection",
+      "source": "semgrep",
+      "locations": [
+        {
+          "file": "api/orders.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Raw SQL built from request args - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "python.lang.security.sqli",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-a3bdb3713b"
+    },
+    {
+      "title": "MD5 used for token derivation",
+      "severity": "medium",
+      "category": "A02:Crypto",
+      "source": "semgrep",
+      "locations": [
+        {
+          "file": "api/tokens.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "MD5 used for token derivation - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "python.lang.security.md5",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-ab6343e0cb"
+    },
+    {
+      "title": "subprocess call with shell=True",
+      "severity": "high",
+      "category": "CWE-78",
+      "source": "bandit",
+      "locations": [
+        {
+          "file": "tools/export.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "subprocess call with shell=True - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "B602",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-8c22f34702"
+    },
+    {
+      "title": "Hardcoded password default",
+      "severity": "medium",
+      "category": "CWE-259",
+      "source": "bandit",
+      "locations": [
+        {
+          "file": "api/config.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Hardcoded password default - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "B105",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-54c45df5c0"
+    },
+    {
+      "title": "File path from user input",
+      "severity": "high",
+      "category": "CWE-22",
+      "source": "gosec",
+      "locations": [
+        {
+          "file": "cmd/serve/files.go",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "File path from user input - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "G304",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-37eabdef0d"
+    },
+    {
+      "title": "Use of weak cipher",
+      "severity": "low",
+      "category": "CWE-327",
+      "source": "gosec",
+      "locations": [
+        {
+          "file": "internal/crypto/legacy.go",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Use of weak cipher - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 3.1,
+      "rule_id": "G401",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-f63a98d37c"
+    },
+    {
+      "title": "Authorization middleware defaults to allow",
+      "severity": "critical",
+      "category": "A01:Broken-Access-Control",
+      "source": "fail_open_defaults",
+      "locations": [
+        {
+          "file": "api/middleware/authz.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Authorization middleware defaults to allow - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "authz-default-allow",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-9e4b996b86"
+    },
+    {
+      "title": "Session id is not rotated on login",
+      "severity": "high",
+      "category": "A07:Identification-Failures",
+      "source": "sast",
+      "locations": [
+        {
+          "file": "api/auth/session.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Session id is not rotated on login - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "session-fixation",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-7ffeeb1b58"
+    },
+    {
+      "title": "Order lookup trusts a client-supplied tenant id",
+      "severity": "critical",
+      "category": "API1:BOLA",
+      "source": "kavach-api",
+      "locations": [
+        {
+          "file": "api/orders.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Order lookup trusts a client-supplied tenant id - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-546465fd24"
+    },
+    {
+      "title": "Price is recomputed from the client payload",
+      "severity": "high",
+      "category": "Billing-Bypass",
+      "source": "kavach-billing",
+      "locations": [
+        {
+          "file": "api/checkout.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Price is recomputed from the client payload - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-5b33b69738"
+    },
+    {
+      "title": "Refund state machine allows double credit",
+      "severity": "high",
+      "category": "A04:Insecure-Design",
+      "source": "kavach-state",
+      "locations": [
+        {
+          "file": "api/refunds.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Refund state machine allows double credit - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-728e747b92"
+    },
+    {
+      "title": "JWT signing key is derived from a short constant",
+      "severity": "medium",
+      "category": "A02:Crypto",
+      "source": "kavach-crypto",
+      "locations": [
+        {
+          "file": "api/auth/jwt.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "JWT signing key is derived from a short constant - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-edfbbde259"
+    },
+    {
+      "title": "The idna advisory is reachable from the public parser",
+      "severity": "high",
+      "category": "A06:Vulnerable-Components",
+      "source": "kavach-supply",
+      "locations": [
+        {
+          "file": "api/parsers/idn.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "The idna advisory is reachable from the public parser - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Upgrade to a patched release.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "CVE-2024-3651",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-c402fae51c"
+    },
+    {
+      "title": "Four authorization controls exist but default off",
+      "severity": "critical",
+      "category": "A01:Broken-Access-Control",
+      "source": "reconciler",
+      "locations": [
+        {
+          "file": "api/middleware/authz.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Four authorization controls exist but default off - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-6b8cee5cb4"
+    },
+    {
+      "title": "Hardcoded secret: Stripe live key",
+      "severity": "critical",
+      "category": "A07:Secrets",
+      "source": "gitleaks",
+      "locations": [
+        {
+          "file": "deploy/env.prod",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Hardcoded secret: Stripe live key - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Remove, rotate, and load from a secret manager.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "stripe-access-token",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-1f18cc7228"
+    },
+    {
+      "title": "Verified secret: AWS",
+      "severity": "critical",
+      "category": "A07:Secrets",
+      "source": "trufflehog",
+      "locations": [
+        {
+          "file": "scripts/deploy.sh",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Verified secret: AWS - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Remove, rotate, and load from a secret manager.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "AWS",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-2a4f59a615"
+    },
+    {
+      "title": "Hardcoded secret: generic API key",
+      "severity": "high",
+      "category": "A07:Secrets",
+      "source": "builtin-secrets",
+      "locations": [
+        {
+          "file": "api/settings.py",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Hardcoded secret: generic API key - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Remove, rotate, and load from a secret manager.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 7.5,
+      "rule_id": "generic-api-key",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-ca03ec0a5e"
+    },
+    {
+      "title": "Secret in deploy/env.staging: AWS Access Key ID",
+      "severity": "critical",
+      "category": "A07:Secrets",
+      "source": "trivy",
+      "locations": [
+        {
+          "file": "deploy/env.staging",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Secret in deploy/env.staging: AWS Access Key ID - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Remove, rotate, and load from a secret manager.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 9.1,
+      "rule_id": "aws-access-key-id",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-11ec3a8e61"
+    },
+    {
+      "title": "Secret zeroization bypass: env var read",
+      "severity": "medium",
+      "category": "A02:Crypto",
+      "source": "rust-secret-apis",
+      "locations": [
+        {
+          "file": "agent/src/config.rs",
+          "line": 12,
+          "snippet": null
+        }
+      ],
+      "what_it_is": "Secret zeroization bypass: env var read - reduced fixture row.",
+      "how_exploited": "",
+      "business_impact": "",
+      "remediation": "Declare the hardened value explicitly.",
+      "fix_impact": "",
+      "effort": "",
+      "confidence": "confirmed",
+      "cvss_vector": "",
+      "cvss_score": 5.3,
+      "rule_id": "env-var-secret",
+      "references": [],
+      "kill_chain": null,
+      "finding_class": "",
+      "id": "KAVACH-036a0d888a"
+    }
+  ]
+}

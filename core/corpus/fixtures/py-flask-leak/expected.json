@@ -1,0 +1,10 @@
+{
+  "description": "Flask app with hardcoded keys, unauth LLM proxy, command injection, debug=True",
+  "stack": {
+    "frameworks": ["Flask"],
+    "llm_providers": ["OpenAI"],
+    "payment_processors": ["Razorpay"],
+    "cloud": ["AWS"]
+  },
+  "min_secrets": 3
+}
