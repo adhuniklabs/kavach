@@ -5,6 +5,26 @@ All notable changes to Adhunik Kavach are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed — resume safety
+
+Both of these only show up on the path a resume actually takes, which is why they survived: a
+phase stays actionable until its gate artifact exists, so `ingest` re-runs over the same result
+files on every resume.
+
+- **`ingest` is idempotent.** It skipped nothing and numbered drafts sequentially, so folding a
+  result twice wrote a second copy of every finding — and the duplicates reached the report as
+  inflated counts. Drafts already carry the finding's fingerprint as `kavach_id`, so that now
+  answers "have I folded this in already?" A re-run dispatch that re-reports what it already
+  found is deduplicated the same way.
+- **A truncated result file no longer fails the whole phase.** The agent writes its own result,
+  so the engine cannot make that write atomic; a dispatch killed mid-write left JSON that raised
+  on `ingest` and took its seven valid siblings down with it, on every resume. Unreadable results
+  are now moved to `runs/<phase>/corrupt/` and reported, the rest fold in, and the phase gate
+  stays open so the missing dispatch is re-planned. `runs/<phase>/*.json` therefore holds only
+  readable results, which keeps "did this dispatch produce a result?" a plain existence check.
+
+`dispatch.ingest` returns `(written, skipped)` rather than a count.
+
 ### Discovery cost: the code graph and the scope
 
 A hunter spends most of its budget on *discovery* - grep for a symbol, open the file, follow the

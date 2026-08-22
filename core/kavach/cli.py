@@ -630,12 +630,30 @@ def cmd_ingest(args) -> int:
         _log(f"KAVACH ingest → no result file under "
              f"{dispatch.result_glob(out, args.phase)} (pass --result to name one)")
         return 5
-    total = 0
+    total = skipped = 0
+    corrupt: list[str] = []
     for path in results:
-        n = dispatch.ingest(out, args.phase, path)
+        rel = os.path.relpath(path, out)
+        try:
+            n, dup = dispatch.ingest(out, args.phase, path)
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            # One dispatch killed mid-write must not cost the phase its other seven results.
+            dest = dispatch.quarantine(out, path)
+            corrupt.append(rel)
+            _log(f"  {rel} → unreadable ({exc}); moved to "
+                 f"{os.path.relpath(dest, out)} — that dispatch will re-run")
+            continue
         total += n
-        _log(f"  {os.path.relpath(path, out)} → {n} draft(s)")
-    _log(f"KAVACH ingest → {total} draft(s) from {len(results)} result file(s)")
+        skipped += dup
+        _log(f"  {rel} → {n} draft(s)" + (f", {dup} already folded in" if dup else ""))
+    note = f"{total} draft(s) from {len(results) - len(corrupt)} result file(s)"
+    if skipped:
+        note += f" · {skipped} already present"
+    if corrupt:
+        note += f" · {len(corrupt)} unreadable"
+    _log(f"KAVACH ingest → {note}")
+    # Unreadable results are reported, not fatal: the phase gate stays open, so the missing
+    # dispatch is re-planned on the next loop.
     return 0
 
 

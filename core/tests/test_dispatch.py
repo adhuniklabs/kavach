@@ -88,24 +88,68 @@ class TestDispatch(unittest.TestCase):
                     locations=[Location(file="a.py", line=1)])
         agent_json = os.path.join(self.dir, "agent-sast.json")
         json.dump({"findings": [f.to_dict()]}, open(agent_json, "w"))
-        n = dispatch.ingest(self.dir, "BL3", agent_json)
-        self.assertEqual(n, 1)
+        written, skipped = dispatch.ingest(self.dir, "BL3", agent_json)
+        self.assertEqual((written, skipped), (1, 0))
         drafts = os.listdir(os.path.join(self.dir, "findings-draft"))
         self.assertTrue(any(d.startswith("bl3-001-") for d in drafts))
 
-    def test_ingest_twice_appends_without_overwrite(self):
+    def test_two_results_append_without_overwriting_each_other(self):
+        """The original invariant: a second result gets its own number, not the first's file."""
+        for i, title in enumerate(("SQLi", "IDOR"), start=1):
+            f = Finding(title=title, severity=Severity.CRITICAL, category="A01",
+                        source="kavach-sast", locations=[Location(file=f"{title}.py", line=1)])
+            path = os.path.join(self.dir, f"agent-{i}.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"findings": [f.to_dict()]}, fh)
+            dispatch.ingest(self.dir, "BL3", path)
+
+        drafts = sorted(os.listdir(os.path.join(self.dir, "findings-draft")))
+        self.assertEqual(len(drafts), 2)
+        self.assertTrue(drafts[0].startswith("bl3-001-"))
+        self.assertTrue(drafts[1].startswith("bl3-002-"))
+
+    def test_re_ingesting_the_same_result_is_a_no_op(self):
+        """Ingest re-runs on every resume - a phase stays actionable until its gate artifact
+        exists - so folding the same result twice is the normal case. Numbering sequentially
+        made that duplicate every finding, and the duplicates reached the report as counts."""
         f = Finding(title="SQLi", severity=Severity.CRITICAL, category="A01", source="kavach-sast",
                     locations=[Location(file="a.py", line=1)])
         agent_json = os.path.join(self.dir, "agent-sast.json")
-        json.dump({"findings": [f.to_dict()]}, open(agent_json, "w"))
+        with open(agent_json, "w", encoding="utf-8") as fh:
+            json.dump({"findings": [f.to_dict()]}, fh)
 
-        dispatch.ingest(self.dir, "BL3", agent_json)
-        dispatch.ingest(self.dir, "BL3", agent_json)
+        self.assertEqual(dispatch.ingest(self.dir, "BL3", agent_json), (1, 0))
+        self.assertEqual(dispatch.ingest(self.dir, "BL3", agent_json), (0, 1))
+        self.assertEqual(len(os.listdir(os.path.join(self.dir, "findings-draft"))), 1)
 
-        drafts = os.listdir(os.path.join(self.dir, "findings-draft"))
-        self.assertEqual(len(drafts), 2)
-        self.assertTrue(any(d.startswith("bl3-001-") for d in drafts))
-        self.assertTrue(any(d.startswith("bl3-002-") for d in drafts))
+    def test_a_re_run_dispatch_does_not_duplicate_what_it_already_found(self):
+        """A dispatch killed after writing is re-run on resume; it will re-report the finding
+        it already contributed, under a different result filename."""
+        f = Finding(title="SQLi", severity=Severity.CRITICAL, category="A01", source="kavach-sast",
+                    locations=[Location(file="a.py", line=1)])
+        for name in ("kavach-sast-1.json", "kavach-sast-1-rerun.json"):
+            path = os.path.join(self.dir, name)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"findings": [f.to_dict()]}, fh)
+            dispatch.ingest(self.dir, "BL3", path)
+        self.assertEqual(len(os.listdir(os.path.join(self.dir, "findings-draft"))), 1)
+
+    def test_a_truncated_result_is_quarantined_not_left_to_poison_the_phase(self):
+        """The agent writes its own result file, so the engine cannot make that write atomic.
+        Left in place, one killed dispatch fails ingest for the whole phase on every resume."""
+        path = dispatch.result_path(self.dir, "BL3", "kavach-api", index=2)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write('{"findings":[{"title":"partial')
+        with self.assertRaises(json.JSONDecodeError):
+            dispatch.ingest(self.dir, "BL3", path)
+
+        dest = dispatch.quarantine(self.dir, path)
+        self.assertFalse(os.path.exists(path))
+        self.assertTrue(os.path.exists(dest))
+        self.assertIn("corrupt", dest)
+        # runs/<phase>/*.json now holds only readable results, so "did this dispatch produce
+        # a result?" stays a plain existence check for the harness.
+        self.assertEqual(glob.glob(dispatch.result_glob(self.dir, "BL3")), [])
 
     def test_concurrent_ingest_same_phase_does_not_collide_draft_numbers(self):
         # Widen the race window inside the locked section: without the lock in ingest(),
@@ -126,7 +170,7 @@ class TestDispatch(unittest.TestCase):
             agent_json = os.path.join(self.dir, f"agent-{i}.json")
             with open(agent_json, "w", encoding="utf-8") as fh:
                 json.dump({"findings": [f.to_dict()]}, fh)
-            results[i] = dispatch.ingest(self.dir, "BL3", agent_json)
+            results[i] = dispatch.ingest(self.dir, "BL3", agent_json)[0]
 
         with patch.object(dispatch, "_next_draft_number", side_effect=_slow_next):
             threads = [threading.Thread(target=_run, args=(i,)) for i in range(5)]
