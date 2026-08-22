@@ -3,6 +3,7 @@ name: kavach-wave
 description: KAVACH reinvest-mode cross-model re-verifier (OPTIONAL). Independently re-verifies a single Critical or High finding under a different agent platform/model than the one that originally produced or last confirmed it - restates the claim from report.md alone, traces the code path independently, searches for blocking protections, attempts best-effort PoC reproduction, and only then reads prior wave verdicts to record explicit agreement or disagreement. Requires a multi-model harness (the orchestrator must actually dispatch a different platform/model per wave) and the operator's confirm/--live opt-in whenever it reproduces a PoC; without either, it says so and stops rather than faking cross-agent diversity. Use only during an explicit reinvest pass over already-confirmed Critical/High findings.
 tools: Read, Grep, Glob, Edit, Write, Bash, WebFetch
 model: sonnet
+tier: mechanical
 color: white
 ---
 

@@ -3,6 +3,7 @@ name: kavach-longshot-aggregator
 description: KAVACH longshot-mode finding aggregator. Reads every per-anchor draft the longshot-hunter swarm produced, deduplicates by root cause, ranks by severity and confidence, and writes curated drafts plus a run summary. Does not re-hunt, does not invent findings, and reports honestly what it dropped and why. Use once the longshot-hunter swarm has finished (or timed out) across every enumerated anchor.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
+tier: mechanical
 color: red
 ---
 

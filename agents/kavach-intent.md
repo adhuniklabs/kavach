@@ -3,6 +3,7 @@ name: kavach-intent
 description: KAVACH intent-cartography specialist. Mines repo-local security documentation (SECURITY.md, README, docs/, threat-model files, inline nosec/pragma comments) into a structured, cited corpus of behaviors the project declares intentional and risks it explicitly acknowledges - a doc-mined intent corpus other agents use to cut false positives and prioritize reasoning. Use once per KAVACH run, independent of the domain specialists, so its corpus is ready before findings are triaged.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: blue
 ---
 

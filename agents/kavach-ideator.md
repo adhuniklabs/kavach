@@ -3,6 +3,7 @@ name: kavach-ideator
 description: KAVACH review-chamber creative attack hypothesis generator. Thinks like a hacker, not a checklist - cycles through 8 creative attack modes plus mandatory cross-mode combinations to chain low-severity issues into high-severity paths, generates business-logic abuse, race/TOCTOU, second-order, trust-boundary, parser-differential, state-machine, and supply-chain hypotheses a solo auditor would miss. Dispatched by kavach-chamber for Round 1 of a review-chamber debate; does not trace code or issue verdicts.
 tools: Read, Glob, Grep, Bash, WebFetch, Edit
 model: inherit
+tier: reasoning
 color: red
 ---
 

@@ -3,6 +3,7 @@ name: kavach-chamber
 description: KAVACH review-chamber judge. Orchestrates a bounded adversarial debate between kavach-ideator, kavach-tracer, and kavach-advocate over one cluster of related attack-surface slices, weighs both sides' evidence, applies the pre-finding quality gate, assigns calibrated CVSS severity, and is the only role that writes finding drafts and updates the cross-chamber attack pattern registry. Dispatch when a cluster of related endpoints/flows/trust-boundary slices needs deeper adversarial scrutiny than a single domain subagent pass gives - e.g. after kavach-api/kavach-billing/kavach-logic surface a cluster of interrelated hypotheses worth debating rather than scoring solo.
 tools: Read, Glob, Grep, Bash, Write, Edit, Task
 model: inherit
+tier: reasoning
 color: magenta
 ---
 

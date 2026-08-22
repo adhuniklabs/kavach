@@ -3,6 +3,7 @@ name: kavach-api
 description: KAVACH API security + auth/session specialist. Traces every endpoint for BOLA/IDOR, BFLA, broken auth, mass assignment, excessive data exposure, missing rate limits, and CORS/"frontend-only" naivety. Mostly manual route reading - scanners barely help here. Dispatch as part of the BL3/DP4 static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: orange
 ---
 

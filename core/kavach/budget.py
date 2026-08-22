@@ -32,6 +32,7 @@ UNLIMITED = "unlimited"
 WITHIN_BUDGET = "within budget"
 DISPATCH_CEILING = "dispatch ceiling"
 WALL_CLOCK = "wall clock"
+COST_CEILING = "cost ceiling"
 
 
 @dataclass
@@ -56,26 +57,37 @@ def _audit(f: state.AuditStateFile, audit_id: str) -> state.AuditRunState:
     raise KeyError(audit_id)
 
 
-def _new_ledger(mode: str, max_dispatches: int | None, max_wall_seconds: int | None) -> dict:
+def _new_ledger(mode: str, max_dispatches: int | None, max_wall_seconds: int | None,
+                max_cost_usd: float | None = None) -> dict:
     ceiling = (max_dispatches if max_dispatches is not None
                else flags.max_dispatches(DEFAULT_MAX_DISPATCHES.get(mode, 60)))
     wall = (max_wall_seconds if max_wall_seconds is not None
             else flags.max_wall_seconds(DEFAULT_MAX_WALL_SECONDS))
-    return {"max_dispatches": ceiling, "max_wall_seconds": wall, "dispatches": 0,
-            "started_at": _now(), "by_phase": {}, "shed": []}
+    cost = flags.max_cost_usd(0.0) if max_cost_usd is None else max_cost_usd
+    return {"max_dispatches": ceiling, "max_wall_seconds": wall, "max_cost_usd": cost,
+            "dispatches": 0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
+            "started_at": _now(), "by_phase": {}, "spend_by_phase": {}, "shed": []}
 
 
 def init_budget(audit_dir: str, audit_id: str, mode: str, *, max_dispatches: int | None = None,
-                max_wall_seconds: int | None = None) -> dict:
-    ledger = _new_ledger(mode, max_dispatches, max_wall_seconds)
+                max_wall_seconds: int | None = None, max_cost_usd: float | None = None) -> dict:
+    ledger = _new_ledger(mode, max_dispatches, max_wall_seconds, max_cost_usd)
     state.mutate_state(audit_dir, lambda f: setattr(_audit(f, audit_id), "budget", ledger))
     return ledger
+
+
+# Ledger keys added after the first ledgers were written. Backfilled on read so an audit
+# resumed from an older audit-state.json accounts the same as a fresh one.
+_LEDGER_DEFAULTS = {"max_cost_usd": 0.0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
+                    "spend_by_phase": {}}
 
 
 def _ensure(run: state.AuditRunState) -> dict:
     """Lazily seed a ledger so an audit-state.json written before v0.3 still accounts."""
     if not run.budget:
         run.budget = _new_ledger(run.mode, None, None)
+    for key, default in _LEDGER_DEFAULTS.items():
+        run.budget.setdefault(key, type(default)() if isinstance(default, dict) else default)
     return run.budget
 
 
@@ -91,7 +103,11 @@ def show(audit_dir: str, audit_id: str | None = None) -> dict[str, Any]:
         return {"audit_id": run.audit_id, "mode": run.mode}
     ceiling = ledger["max_dispatches"]
     remaining = None if ceiling == 0 else max(0, ceiling - ledger["dispatches"])
+    cost_ceiling = ledger.get("max_cost_usd", 0.0)
+    spent = round(ledger.get("cost_usd", 0.0), 6)
     return {**ledger, "audit_id": run.audit_id, "mode": run.mode, "remaining": remaining,
+            "cost_usd": spent,
+            "cost_remaining": None if not cost_ceiling else round(max(0.0, cost_ceiling - spent), 6),
             "elapsed_seconds": int(time.time() - _epoch(ledger["started_at"])),
             "exhausted": remaining == 0}
 
@@ -100,6 +116,12 @@ def _decide(ledger: dict, planned: int) -> Decision:
     wall = ledger["max_wall_seconds"]
     if wall and time.time() - _epoch(ledger["started_at"]) >= wall:
         return Decision(allowed=0, dropped=max(0, planned), reason=WALL_CLOCK)
+    # Cost is checked before the dispatch ceiling for the same reason wall clock is: a run
+    # that has spent its money must stop fanning out and go write the report, and the
+    # reader is owed the reason it stopped rather than a count that looks unfinished.
+    cost_ceiling = ledger.get("max_cost_usd", 0.0)
+    if cost_ceiling and ledger.get("cost_usd", 0.0) >= cost_ceiling:
+        return Decision(allowed=0, dropped=max(0, planned), reason=COST_CEILING)
     if ledger["max_dispatches"] == 0:
         return Decision(allowed=max(0, planned), dropped=0, reason=UNLIMITED)
     remaining = max(0, ledger["max_dispatches"] - ledger["dispatches"])
@@ -130,13 +152,25 @@ def check(audit_dir: str, audit_id: str, phase: str, planned: int) -> Decision:
     return box[0]
 
 
-def charge(audit_dir: str, audit_id: str, phase: str, n: int) -> dict:
+def charge(audit_dir: str, audit_id: str, phase: str, n: int, *, tokens_in: int = 0,
+           tokens_out: int = 0, cost_usd: float = 0.0) -> dict:
+    """Account for what actually ran. Token and cost figures come from the harness that
+    called the model - the engine never talks to one, so it cannot measure them itself, and
+    a ledger that only counts dispatches cannot tell a reader what the audit cost."""
     box: list[dict] = []
 
     def _tx(f: state.AuditStateFile) -> None:
         ledger = _ensure(_audit(f, audit_id))
         ledger["dispatches"] += n
         ledger["by_phase"][phase] = ledger["by_phase"].get(phase, 0) + n
+        ledger["tokens_in"] += tokens_in
+        ledger["tokens_out"] += tokens_out
+        ledger["cost_usd"] = round(ledger["cost_usd"] + cost_usd, 6)
+        spend = ledger["spend_by_phase"].setdefault(
+            phase, {"tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0})
+        spend["tokens_in"] += tokens_in
+        spend["tokens_out"] += tokens_out
+        spend["cost_usd"] = round(spend["cost_usd"] + cost_usd, 6)
         box.append(dict(ledger))
 
     state.mutate_state(audit_dir, _tx)

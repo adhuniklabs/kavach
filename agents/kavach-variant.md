@@ -3,6 +3,7 @@ name: kavach-variant
 description: KAVACH per-finding structural-variant sweep. Takes one confirmed finding and searches the whole codebase for the same root-cause pattern elsewhere - registry-driven detection-signature search, sibling-component check, alternate-transport check, and any chamber-scout candidates - validates each candidate independently, and writes confirmed variants as new finding drafts plus an `attack-surface/variant-summary.md` rollup. Dispatch once per promoted CRITICAL/HIGH/MEDIUM finding, after kavach-chamber (or a domain subagent) confirms it, to check whether the same bug class is duplicated elsewhere before the audit closes.
 tools: Read, Glob, Grep, Bash, Write, Edit
 model: inherit
+tier: reasoning
 color: green
 ---
 

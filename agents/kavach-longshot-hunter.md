@@ -3,6 +3,7 @@ name: kavach-longshot-hunter
 description: KAVACH hail-mary vulnerability hunter for longshot mode. Anchored on a single source file, follows imports/callers across the repo, and produces evidence-anchored draft findings with strict path:line citations. Does not build a CodeQL/Semgrep database, does not execute the application, and does not fabricate. Use when longshot mode's target enumeration dispatches one worker per anchor file in the swarm.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: sonnet
+tier: mechanical
 color: red
 ---
 

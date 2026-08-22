@@ -176,3 +176,270 @@ def prereqs_for(mode: str, phase: str) -> list[str]:
 
 def gate_for(phase: str) -> list[str]:
     return list(PHASE_GATES.get(phase, []))
+
+
+# --- the dispatch contract -------------------------------------------------------------
+#
+# What a phase asks of the agent running it. This lived in SKILL.md prose, which meant
+# every harness that was not SKILL.md had to re-read that prose and re-encode it - and
+# drift from it silently. `dispatch.compose_prompt` renders these, so `kavach phase-prompt`
+# returns a prompt that can be dispatched as-is.
+#
+# `task` is the imperative; the agent's own `agents/<name>.md` carries the method, so these
+# stay short on purpose. `references` are skill-relative and resolved by `paths.reference`.
+# `inputs` are audit-relative and *additive*: a phase already inherits its prereqs' gate
+# artifacts as inputs (see `inputs_for`), because those are exactly what the prior phases
+# produced for it to read.
+
+BASE_REFERENCES: tuple[str, ...] = ("persona.md", "finding-schema.md", "severity-model.md")
+
+# The eight domain hunters of BL3/DP4, in dispatch order. kavach-sast leads because it owns
+# the phase's literal gate artifact, so the gate can close in the first batch.
+DOMAIN_ROSTER: tuple[str, ...] = (
+    "kavach-sast", "kavach-api", "kavach-llm", "kavach-billing",
+    "kavach-crypto", "kavach-supply", "kavach-config", "kavach-logic",
+)
+
+# Reference files an agent needs whatever phase dispatches it, on top of BASE_REFERENCES.
+AGENT_REFERENCES: dict[str, tuple[str, ...]] = {
+    "kavach-sast": ("domains/sast.md",),
+    "kavach-api": ("domains/api.md",),
+    "kavach-llm": ("domains/llm.md",),
+    "kavach-billing": ("domains/billing.md",),
+    "kavach-crypto": ("domains/crypto.md",),
+    "kavach-supply": ("domains/supply.md",),
+    "kavach-config": ("domains/config.md", "insecure-defaults.md"),
+    "kavach-logic": ("domains/logic.md",),
+    "kavach-chamber": ("chamber-protocol.md", "creative-attack-modes.md", "attack-trees.md"),
+    "kavach-ideator": ("creative-attack-modes.md", "attack-trees.md"),
+    "kavach-tracer": ("chamber-protocol.md",),
+    "kavach-advocate": ("chamber-protocol.md", "vuln-class-applicability.md"),
+    "kavach-probe": ("probe-protocol.md",),
+    "kavach-reasoner-backward": ("probe-protocol.md",),
+    "kavach-reasoner-contradiction": ("probe-protocol.md",),
+    "kavach-harvester": ("probe-protocol.md", "verification-gates.md"),
+    "kavach-verifier": ("verification-gates.md", "vuln-class-applicability.md"),
+    "kavach-variant": ("attack-trees.md",),
+    "kavach-variant-scout": ("attack-trees.md",),
+    "kavach-reporter": ("report-template.md", "report-structure.md"),
+    "kavach-confirm-reporter": ("report-template.md", "certification.md"),
+    "kavach-spec": ("parser-differentials.md",),
+    "kavach-poc": ("probe-protocol.md",),
+    "kavach-poc-executor": ("probe-protocol.md",),
+    "kavach-intel": ("tool-catalog.md",),
+}
+
+
+class PhaseSpec:
+    """One phase's dispatch contract. Frozen by convention, not by dataclass - the registry
+    is module-level constant data and nothing mutates it."""
+
+    __slots__ = ("task", "references", "inputs", "roster", "sequential")
+
+    def __init__(self, task: str, *, references: tuple[str, ...] = (),
+                 inputs: tuple[str, ...] = (), roster: tuple[str, ...] = (),
+                 sequential: bool = False):
+        self.task = task
+        self.references = references
+        self.inputs = inputs
+        self.roster = roster
+        self.sequential = sequential
+
+
+_SCAN_TASK = (
+    "Treat every scanner hit in your slice as a lead, not a finding: open the cited "
+    "file:line, read it, and either confirm it or drop it as a false positive with the "
+    "reason. Then hunt what the scanners cannot see in your domain. Every finding cites a "
+    "real file:line you have read; every 'control present' claim cites the enforcing line."
+)
+_POC_TASK = (
+    "Build the proof-of-concept for the finding directory you were given - a minimized, "
+    "parameterized exploit script, or a theoretical write-up when no live target is "
+    "authorized - and write the PoC metadata back into that finding's draft."
+)
+_REPORT_TASK = (
+    "Read the finding directory cold and author its disclosure-ready, self-contained "
+    "report.md per the vuln-report contract. No pointers back to a draft, a debate, or a "
+    "phase id. Skip a report.md that already satisfies the contract."
+)
+_CHAMBER_TASK = (
+    "Run the review chamber over the clustered attack surface: ideate hypotheses, trace "
+    "each through real code, have the advocate build the strongest defense, then weigh "
+    "both sides and write drafts only for what survives with calibrated severity."
+)
+_VERIFY_TASK = (
+    "Cold-verify this Critical/High finding with no context from whatever produced it. "
+    "Re-trace the path from scratch, re-run the five-layer protection search, and issue "
+    "CONFIRMED or DISPROVED against the fixed list of rationalizations you may not accept."
+)
+_VARIANT_TASK = (
+    "Take this confirmed finding's root-cause pattern and search the whole codebase for the "
+    "same bug elsewhere - detection signature, sibling components, alternate transports. "
+    "Validate each candidate independently before writing it as a new draft."
+)
+
+PHASE_SPECS: dict[str, PhaseSpec] = {
+    # lite
+    "LT2": PhaseSpec(_SCAN_TASK + " You own this phase's gate artifact.",
+                     roster=("kavach-sast",)),
+    "LT3": PhaseSpec(_POC_TASK),
+    # balanced
+    "BL1": PhaseSpec(
+        "Sweep published advisories (CVE/GHSA/OSV/NVD) for the detected stack and inventory "
+        "every third-party component the target relies on. Never invent an advisory id."),
+    "BL2": PhaseSpec(
+        "Build the threat model: classify the project, map trust boundaries and data flow "
+        "into DFD/CFD slices, and carve out the unauthenticated attack surface the rest of "
+        "the audit leans on. Read recon.json rather than rediscovering the stack.",
+        references=("attack-trees.md",)),
+    "BL3": PhaseSpec(_SCAN_TASK, roster=DOMAIN_ROSTER),
+    "BL4": PhaseSpec(
+        "Probe the attack surface the domain pass just built, by hand. Scanners are done; "
+        "what is left is the reasoning they cannot do.",
+        references=("probe-protocol.md",)),
+    "BL5": PhaseSpec(_CHAMBER_TASK),
+    "BL6": PhaseSpec(_POC_TASK),
+    "BL6b": PhaseSpec(_REPORT_TASK),
+    # deep
+    "DP1": PhaseSpec(
+        "Sweep published advisories (CVE/GHSA/OSV/NVD) for the detected stack and inventory "
+        "every third-party component the target relies on. Never invent an advisory id."),
+    "DP2": PhaseSpec(
+        "Mine the git history for security-relevant commits carrying no CVE/GHSA label, then "
+        "review each candidate patch for soundness across the seven bypass vectors. History "
+        "runs first; the bypass review needs its commit context and owns the gate artifact.",
+        roster=("kavach-history", "kavach-patch"), sequential=True),
+    "DP3": PhaseSpec(
+        "Build the threat model: classify the project, map trust boundaries and data flow "
+        "into DFD/CFD slices, and carve out the unauthenticated attack surface the rest of "
+        "the audit leans on. Read recon.json rather than rediscovering the stack.",
+        references=("attack-trees.md",)),
+    "DP4": PhaseSpec(_SCAN_TASK, roster=DOMAIN_ROSTER),
+    "DP5": PhaseSpec(
+        "Trace every endpoint for BOLA/IDOR, BFLA, broken auth, mass assignment, excessive "
+        "data exposure and missing rate limits, and write the authorization matrix."),
+    "DP6": PhaseSpec(
+        "Mine state-holding entities and concurrency primitives, then sweep for TOCTOU, "
+        "isolation bugs, state-ordering violations, idempotency failures and double-submit "
+        "races - the temporal bugs syntactic analysis misses."),
+    "DP7": PhaseSpec(
+        "Find security-relevant gaps between the specs and framework contracts this codebase "
+        "implements and what it actually does: parsing, normalization, canonicalization, "
+        "state-machine compliance, middleware semantics."),
+    "DP8": PhaseSpec(
+        "Run the deep-probe team over each component: map the attack surface, dispatch both "
+        "reasoners in parallel for independent hypothesis rounds, cross-pollinate, then "
+        "harvest causal-challenged evidence before any verdict.",
+        references=("probe-protocol.md",)),
+    "DP9": PhaseSpec(
+        "Stitch inter-component data flows into one edge graph and propagate taint across "
+        "service boundaries single-codebase analysis cannot follow. A clean no-op on a "
+        "single-service project is a valid result."),
+    "DP10": PhaseSpec(_CHAMBER_TASK),
+    "DP11": PhaseSpec(_VERIFY_TASK),
+    "DP12": PhaseSpec(_VARIANT_TASK),
+    "DP13": PhaseSpec(_POC_TASK),
+    "DP14": PhaseSpec(_REPORT_TASK),
+    "DP16": PhaseSpec(
+        "Aggregate every confirm_status verdict this run produced into the confirmation "
+        "report. The nine states are orthogonal metadata, never a second severity axis.",
+        references=("certification.md",)),
+    # diff
+    "DF1": PhaseSpec(
+        _SCAN_TASK + " Scope yourself to the changed files named in "
+        "attack-surface/diff-scope.md - nothing outside that set is in scope for this run.",
+        inputs=("attack-surface/diff-scope.md",), roster=("kavach-sast",)),
+    # confirm
+    "CF1_5": PhaseSpec(
+        "Compare each draft finding against the intent corpus and emit match / partial / no "
+        "/ contested per finding. Annotate; never touch severity or confirm status.",
+        inputs=("attack-surface/intent-corpus.json",)),
+    "CF2": PhaseSpec(
+        "Discover every way this application can be built, run and tested, plus its "
+        "datastores, required env vars and auth scaffolding. Discovery only - build nothing."),
+    "CF3": PhaseSpec(
+        "Provision the sandboxed application by walking the discovered strategies top to "
+        "bottom. Refuse any target you cannot positively confirm is sandboxed or local."),
+    "CF4": PhaseSpec(
+        "Execute each finding's PoC against the live sandboxed application, parse its "
+        "structured verdict, and record confirm_status plus evidence. State the blast radius "
+        "and wait for explicit go-ahead before every exploit attempt."),
+    "CF5": PhaseSpec(
+        "For findings live execution could not confirm, generate a minimal inverted-assertion "
+        "reproducer in the target's own test framework and run it under double-timeout "
+        "discipline."),
+    "CF6": PhaseSpec(
+        "Aggregate every confirm_status verdict this run produced into the confirmation "
+        "report. The nine states are orthogonal metadata, never a second severity axis.",
+        references=("certification.md",)),
+    # revisit
+    "RV0": PhaseSpec(
+        "Mine repo-local security documentation into a cited corpus of behaviors this project "
+        "declares intentional and risks it explicitly acknowledges."),
+    "RV5": PhaseSpec(
+        "Probe the target fresh, with the known findings held out, so this pass can only "
+        "surface what the prior audit missed.",
+        references=("probe-protocol.md",)),
+    "RV7": PhaseSpec(_SCAN_TASK, roster=("kavach-sast",)),
+    "RV8": PhaseSpec(_CHAMBER_TASK),
+    "RV9": PhaseSpec(_VERIFY_TASK),
+    "RV10": PhaseSpec(_VARIANT_TASK),
+    "RV10k": PhaseSpec(_VARIANT_TASK + " These are the findings already known from the prior "
+                       "audit - you are checking whether each has spread, not re-proving it."),
+    "RV11": PhaseSpec(_POC_TASK),
+    "RV11b": PhaseSpec(_REPORT_TASK),
+    # merge
+    "MG2": PhaseSpec(
+        "Collapse semantic near-duplicates across the source finding sets and record every "
+        "dedup decision. Two findings with the same root cause at the same location are one."),
+    # longshot
+    "LS2": PhaseSpec(
+        "Anchor on the single source file you were given, follow its imports and callers "
+        "across the repo, and produce evidence-anchored drafts with strict path:line "
+        "citations. A no-finding marker is a valid, expected result."),
+    "LS3": PhaseSpec(
+        "Read every per-anchor draft the swarm produced, deduplicate by root cause, rank by "
+        "severity and confidence, and report honestly what you dropped and why."),
+}
+
+
+def spec_for(phase: str) -> PhaseSpec:
+    """Every phase has a contract; phases with no registry entry get the generic one so a
+    caller never has to branch on presence."""
+    return PHASE_SPECS.get(phase) or PhaseSpec(
+        f"Execute phase {phase} ({PHASE_LABELS.get(phase, phase)}) and write its gate "
+        "artifact.")
+
+
+def roster_for(phase: str) -> list[str]:
+    """The agents this phase dispatches, in order. A single-agent phase returns its one
+    executor; a `core:` phase returns nothing to dispatch."""
+    spec = PHASE_SPECS.get(phase)
+    if spec is not None and spec.roster:
+        return list(spec.roster)
+    agent = PHASE_AGENT.get(phase, "")
+    return [] if not agent or agent.startswith("core:") else [agent]
+
+
+def references_for(phase: str, agent: str | None = None) -> list[str]:
+    """Skill-relative reference paths for one dispatch, deduplicated, in load order."""
+    out: list[str] = []
+    for name in BASE_REFERENCES + spec_for(phase).references + AGENT_REFERENCES.get(agent or "", ()):
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def inputs_for(mode: str, phase: str) -> list[str]:
+    """Audit-relative artifacts this phase reads. A phase's prereqs' gate artifacts are
+    exactly what the phases before it produced for it, so they are inherited rather than
+    restated - `findings` is a directory gate, not a file, and is dropped."""
+    out = ["recon.json", "findings.json"]
+    for prereq in prereqs_for(mode, phase):
+        for artifact in gate_for(prereq):
+            if artifact != "findings" and artifact not in out:
+                out.append(artifact)
+    for artifact in spec_for(phase).inputs:
+        if artifact not in out:
+            out.append(artifact)
+    return out

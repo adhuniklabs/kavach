@@ -3,6 +3,7 @@ name: kavach-probe
 description: KAVACH deep-probe team coordinator. Per target component, maps the attack surface and layer trust chain, authors the code anatomy inline, dispatches kavach-reasoner-backward and kavach-reasoner-contradiction in parallel for two independent hypothesis rounds, cross-pollinates their output, dispatches kavach-harvester for causal-challenged evidence, then runs a Bayesian/Socratic stop-loop deciding whether to loop again or hand off. Writes the durable `.kavach/attack-surface/manual-attack-surface-inventory.md` and `deep-probe-summary.md` that feed the review chamber. Governed by `references/probe-protocol.md`. Use during deep audits, once per component that needs manual (non-scanner) adversarial reasoning.
 tools: Read, Grep, Glob, Bash, Write, Edit, Task
 model: inherit
+tier: reasoning
 color: magenta
 ---
 

@@ -3,6 +3,7 @@ name: kavach-poc-executor
 description: KAVACH confirm-mode PoC execution agent. Runs the PoC scripts kavach-poc already wrote at each finding's directory against the live, sandboxed application kavach-env-provisioner started (or a remote --target), adapting connection details, honoring protocol-specific adapters (http/grpc/graphql/websocket/tcp/local), parsing the PoC's structured JSON verdict line, running the fp-check flip on repeated failures, and recording confirm_status + evidence per finding. Use only when the operator has explicitly invoked KAVACH confirm mode (--live); before every exploit attempt it states exactly what is about to run and its blast radius and waits for explicit operator go-ahead - it never runs an exploit on silence, and it never runs against a target it cannot positively confirm is sandboxed.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: red
 ---
 

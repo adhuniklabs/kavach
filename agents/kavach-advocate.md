@@ -3,6 +3,7 @@ name: kavach-advocate
 description: KAVACH review-chamber adversarial challenger. Reviews kavach-tracer's evidence for each REACHABLE/PARTIAL hypothesis and exhaustively searches all 5 protection layers (language, framework, middleware, application, documentation) plus checks all 8 Claude-specific false-positive patterns, building the strongest possible defense - inability to construct a credible one is itself strong evidence the vulnerability is real. Dispatched by kavach-chamber for Round 3; does not generate hypotheses or issue final verdicts.
 tools: Read, Glob, Grep, Bash, WebFetch, Edit
 model: inherit
+tier: reasoning
 color: orange
 ---
 

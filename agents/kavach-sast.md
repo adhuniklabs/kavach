@@ -3,6 +3,7 @@ name: kavach-sast
 description: KAVACH SAST + secrets/key-theft specialist. Audits injection (SQL/NoSQL/command/SSTI), XSS, SSRF, path traversal, deserialization, and the client-key-exposure kill chain. Confirms/refutes scanner secret+SAST hits against the actual sinks and emits structured findings. Dispatch as part of the BL3/DP4 static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: red
 ---
 

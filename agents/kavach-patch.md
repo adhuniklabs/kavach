@@ -3,6 +3,7 @@ name: kavach-patch
 description: KAVACH patch-bypass specialist. Receives a security patch diff (from a known advisory or from kavach-history's undisclosed-fix candidates) and systematically tests whether the fix is sound, bypassable, or merely relocated the vulnerability across seven bypass vectors. Use when kavach-intel or kavach-history has surfaced a patch commit that needs an adversarial second look before it's trusted as "fixed."
 tools: Read, Grep, Glob, Bash, WebFetch, Write
 model: inherit
+tier: reasoning
 color: red
 ---
 

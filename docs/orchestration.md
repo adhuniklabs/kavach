@@ -9,9 +9,19 @@ cleanly down one seam:
   bookkeeping, fan-out batch planning, the findings-draft→findings tree, per-finding and KB
   rendering, diff-scoping, merge/dedupe, cleanup, and the score/gate/certification. It never talks
   to a model and never dispatches a sub-agent.
-- **`SKILL.md`** (the VAJRA lead, running inside Claude Code) is the only thing that issues `Task`
-  calls. It asks the engine "what's actionable right now," gets back a composed prompt per phase,
-  dispatches the actual sub-agent(s), and hands the raw result back to the engine to fold in.
+- **A harness** - `SKILL.md` (the VAJRA lead, running inside Claude Code) or any other program -
+  is the only thing that issues `Task` calls. It asks the engine "what's actionable right now,"
+  gets back a composed prompt per phase, dispatches the actual sub-agent(s), and hands the raw
+  result back to the engine to fold in.
+
+**The engine owns the whole dispatch contract, not half of it.** It used to compose a one-line body
+(`"Execute phase BL3 (Static Analysis & Triage)."`) and leave the real instruction - which
+references to load, which agents fan out, what the phase must produce - in `SKILL.md` prose. That
+made `SKILL.md` the spec rather than a client of it: every other harness had to re-read the prose
+and re-encode it, and drift from it silently. `modes.PHASE_SPECS` now holds the task, the reference
+set and the fan-out roster per phase, `modes.AGENT_REFERENCES` holds each agent's own reading list,
+and `dispatch.phase_prompt` renders all of it. `SKILL.md` and a third-party driver dispatch the
+same bytes.
 
 Every piece of piolium's in-process machinery (`Scheduler`, `runAgentPhase`, `runBatch`) ports as a
 **plan the skill drives**, never as code that spawns anything itself. This is what keeps KAVACH
@@ -31,22 +41,43 @@ One phase, start to finish, looks like this:
    `{allowed, dropped, reason}` and **records the shed itself**, at decision time. It exits `7` when
    `allowed < planned`, so the skill can branch in bash. The skill dispatches `allowed`, never
    `planned`. See "The dispatch ledger" below.
-3. **Phase-prompt.** For each actionable phase, `SKILL.md` asks the engine to compose the sub-agent
+3. **Phase-prompt.** For each actionable phase, the harness asks the engine to compose the sub-agent
    prompt: `kavach phase-prompt <phase> --mode <mode> --target <path> [--agent A] [--index i]`
-   (backed by `dispatch.compose_prompt`) returns the phase's task body wrapped in a runtime header -
+   (backed by `dispatch.phase_prompt`) returns a **complete, dispatchable prompt** - a runtime header -
    target repo root, audit dir, state file path, mode/phase + label, the output paths this phase is
    expected to write, **the exact absolute path this sub-agent must write its machine result to**
    (`dispatch.result_path` → `runs/<phase>/<agent>[-<index>].json`), and the instruction to keep
    state on disk and write a failure note rather than fabricate a result if blocked.
 
+   — followed by the absolute paths of every reference and audit input that agent must read, and
+   the phase's task from `PHASE_SPECS`. A reference the machine does not have is *named as missing*
+   rather than dropped, so an agent is never left assuming it was given something it was not.
+
    `--index` is load-bearing on a fan-out: without it, N concurrent dispatches of one phase are all
    told to write the same file and clobber each other. The engine cannot detect that for the skill,
    so the contract is "one distinct `--index` per dispatch, 1-based."
+
+   `kavach plan --mode <mode> --json --target <path>` returns the same for every actionable phase at
+   once - roster, per-dispatch index, result path, references, gate artifacts, and whether the roster
+   is sequential. A scripted driver needs nothing from `modes.py` and nothing from this document.
+
+   `kavach agents [--json]` is the roster as data: each agent's tools, its `model:` (what Claude Code
+   reads) and its `tier:` - `reasoning` / `mechanical` / `triage`, the same decision spelled so a
+   harness on any provider can route it. `test_agents_load` fails if the two spellings drift.
+
+   `kavach slice <phase> --agent <name> --index <i>` cuts that domain's leads out of `findings.json`
+   into `runs/<phase>/slices/<agent>-<i>.json`, with a count of what was left to other domains. The
+   eight BL3/DP4 hunters were each being sent the whole finding set, so a 300-row sweep was paid for
+   eight times; the slice also tells the hunter what it did *not* see, because one that believes its
+   slice is the whole set reports coverage it does not have.
 4. **Task.** `SKILL.md` issues the actual `Task` call(s) - batches of at most `KAVACH_MAX_AGENTS`
    (default 6, and it must stay under Claude Code's own `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`,
    default 20) when the phase fans out. The engine never executes a sub-agent; it only told the
    skill how many to run and with what prompt.
 5. **Charge.** `kavach budget charge --phase <id> -n <dispatched>` accounts for what actually ran.
+   A harness that pays per token adds `--tokens-in N --tokens-out M --cost-usd C`; the engine never
+   calls a model, so spend is only ever as real as what the caller reports. With those reported,
+   `--max-cost-usd` becomes a third ceiling that sheds exactly like wall clock does.
 6. **Ingest.** The skill hands the sub-agents' output back to the engine: `kavach ingest <phase>`
    folds **every** `runs/<phase>/*.json` in one call (or `--result <file>` for exactly one), backed
    by `dispatch.ingest`, into `findings-draft/<phase>-NNN-<slug>.md` entries.
@@ -141,9 +172,21 @@ it only changes who calls the model. Everything in this document about plan/phas
 gate/resume applies identically in `--headless` mode; the difference is purely mechanical (the
 engine dispatches instead of the skill).
 
+## The event log
+
+Completion is gate-driven, which makes progress *derivable* from disk but not *observable*: nothing
+recorded why a phase re-ran, what a budget check decided, or how long anything took, so a live view
+had to poll mtimes and guess. `.kavach/events.jsonl` is one JSON object per engine decision,
+appended at the audit root and durable across `cleanup`. Reading it is a tail - no state lock, no
+coordination with the run. Writes are a single `write()` to an `O_APPEND` descriptor with lines
+capped below `PIPE_BUF`, so concurrent phases interleave whole lines; that is also why it is JSONL
+and not a JSON array. `kavach events [--since N]` replays it.
+
 ## Source of truth
 
 - Code: `core/kavach/runner.py` (planner, gates, retry bookkeeping), `core/kavach/state.py`
-  (`audit-state.json` manager), `core/kavach/dispatch.py` (prompt composition + ingest),
-  `core/kavach/scheduler.py` (fan-out batch planning + the `--headless` executor), `core/kavach/
-  retry.py` (backoff math).
+  (`audit-state.json` manager), `core/kavach/modes.py` (`PHASE_SPECS` - the dispatch contract),
+  `core/kavach/dispatch.py` (prompt composition, dispatch plan, ingest), `core/kavach/agentdefs.py`
+  (the roster as data), `core/kavach/slicing.py` (per-agent lead lists), `core/kavach/events.py`
+  (the run log), `core/kavach/budget.py` (dispatch / wall-clock / spend ceilings),
+  `core/kavach/scheduler.py` (fan-out batch planning), `core/kavach/retry.py` (backoff math).

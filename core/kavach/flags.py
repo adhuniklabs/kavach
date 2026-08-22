@@ -12,6 +12,7 @@ FLAG_ENV: dict[str, str] = {
     "longshot_limit": "KAVACH_LONGSHOT_LIMIT",
     "budget": "KAVACH_MAX_DISPATCHES",
     "max_wall_seconds": "KAVACH_MAX_WALL_SECONDS",
+    "max_cost_usd": "KAVACH_MAX_COST_USD",
 }
 
 
@@ -45,3 +46,15 @@ def max_dispatches(default: int) -> int:
 
 def max_wall_seconds(default: int) -> int:
     return _read_ceiling_env("KAVACH_MAX_WALL_SECONDS", default)
+
+
+def max_cost_usd(default: float) -> float:
+    """Dollar ceiling for one audit; 0 means unlimited, like the other two ceilings."""
+    raw = os.environ.get("KAVACH_MAX_COST_USD")
+    if raw is None:
+        return default
+    try:
+        val = float(raw)
+    except ValueError:
+        return default
+    return val if val >= 0 else default

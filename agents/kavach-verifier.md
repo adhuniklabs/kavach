@@ -3,6 +3,7 @@ name: kavach-verifier
 description: KAVACH zero-context cold verifier. Independently re-verifies a single CRITICAL or HIGH finding draft with NO prior context from whatever chamber/subagent produced it - decomposes the claim, re-traces the code path from scratch, re-runs the 5-layer protection search, attempts real-environment reproduction, writes independent prosecution and defense briefs, and issues CONFIRMED or DISPROVED against a fixed list of rationalizations it is not permitted to accept. Dispatch on every CRITICAL/HIGH finding before it is promoted to `.kavach/findings/` - this is what breaks residual confirmation bias a chamber debate can still share across its own roles.
 tools: Read, Glob, Grep, Bash, WebFetch, Write, Edit
 model: inherit
+tier: reasoning
 color: white
 ---
 

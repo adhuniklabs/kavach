@@ -553,3 +553,98 @@ class TestReportsDeliverableMove(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHarnessVerbs(unittest.TestCase):
+    """The verbs a non-SKILL.md harness needs. Each one replaced a paragraph of SKILL.md
+    telling the coordinator to work it out itself, which is how two harnesses drift."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+
+    def _run(self, *argv) -> tuple[int, str]:
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            code = main([*argv])
+        return code, out.getvalue()
+
+    def test_plan_json_carries_the_whole_dispatch_plan(self):
+        state.init_audit(self.dir, "balanced", modes.phases_for("balanced"))
+        code, out = self._run("plan", "--out", self.dir, "--mode", "balanced", "--json")
+        self.assertEqual(code, 0)
+        plan = json.loads(out)
+        self.assertEqual(plan["mode"], "balanced")
+        first = plan["actionable"][0]
+        self.assertEqual(first["phase"], "BL1")
+        self.assertEqual(first["dispatches"][0]["agent"], "kavach-intel")
+
+    def test_plan_without_json_still_prints_bare_phase_ids(self):
+        state.init_audit(self.dir, "balanced", modes.phases_for("balanced"))
+        code, out = self._run("plan", "--out", self.dir, "--mode", "balanced")
+        self.assertEqual((code, out.strip()), (0, "BL1"))
+
+    def test_phase_prompt_is_dispatchable_without_reading_skill_md(self):
+        code, out = self._run("phase-prompt", "BL3", "--out", self.dir, "--mode", "balanced",
+                              "--target", ".", "--agent", "kavach-sast", "--index", "1")
+        self.assertEqual(code, 0)
+        self.assertIn("## Your task", out)
+        self.assertIn("## Read these first", out)
+        self.assertIn(os.path.join("runs", "bl3", "kavach-sast-1.json"), out)
+
+    def test_agents_json_lists_the_roster_with_tiers(self):
+        code, out = self._run("agents", "--out", self.dir, "--json")
+        if code == 5:
+            self.skipTest("agents/ not installed beside the core")
+        roster = {a["name"]: a for a in json.loads(out)["agents"]}
+        self.assertEqual(roster["kavach-triager"]["tier"], "triage")
+        self.assertIn("Bash", roster["kavach-sast"]["tools"])
+
+    def test_slice_writes_one_agents_leads(self):
+        dump_findings(_mixed_findings(), os.path.join(self.dir, "findings.json"))
+        code, out = self._run("slice", "BL3", "--out", self.dir, "--agent", "kavach-supply",
+                              "--index", "6")
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        self.assertEqual(result["included"], 2)     # the two trivy CVEs
+        self.assertEqual(result["excluded"], 5)
+
+    def test_inventory_writes_the_gate_cf7_does_not_delete(self):
+        """CF1's gate used to be written into confirm-workspace/, which CF7's own cleanup
+        removes - so the phase after it deleted the gate of the phase before it."""
+        consolidate(self.dir, _mixed_findings())
+        code, _ = self._run("inventory", "--out", self.dir)
+        self.assertEqual(code, 0)
+        gate = os.path.join(self.dir, "attack-surface", "confirm-findings-inventory.json")
+        self.assertTrue(os.path.exists(gate))
+        with open(gate, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        self.assertTrue(payload["count"])
+        self.assertTrue(any(e["is_aggregate"] for e in payload["findings"]))
+
+    def test_enumerate_needs_recon_first_and_says_so(self):
+        code, _ = self._run("enumerate", "--out", self.dir)
+        self.assertEqual(code, 5)
+
+    def test_enumerate_filters_to_source_and_caps(self):
+        with open(os.path.join(self.dir, "file-manifest.txt"), "w", encoding="utf-8") as fh:
+            fh.write("\n".join(["a.py", "b.ts", "pnpm-lock.yaml", "c.go", "d.md"]))
+        code, _ = self._run("enumerate", "--out", self.dir, "--limit", "2")
+        self.assertEqual(code, 0)
+        with open(os.path.join(self.dir, "attack-surface", "longshot-targets.json"),
+                  encoding="utf-8") as fh:
+            targets = json.load(fh)["targets"]
+        self.assertEqual([t["path"] for t in targets], ["a.py", "b.ts"])
+        self.assertEqual(targets[0]["status"], "pending")
+
+    def test_budget_charge_records_spend_and_events_show_it(self):
+        run = state.init_audit(self.dir, "balanced", modes.phases_for("balanced"))
+        budget.init_budget(self.dir, run.audit_id, "balanced")
+        code, _ = self._run("budget", "charge", "--out", self.dir, "--phase", "BL3", "-n", "6",
+                            "--tokens-in", "1200", "--tokens-out", "300", "--cost-usd", "0.42")
+        self.assertEqual(code, 0)
+        _, shown = self._run("budget", "show", "--out", self.dir)
+        self.assertEqual(json.loads(shown)["cost_usd"], 0.42)
+        _, log = self._run("events", "--out", self.dir)
+        charged = [json.loads(ln) for ln in log.splitlines() if ln]
+        self.assertEqual(charged[-1]["kind"], "budget_charge")
+        self.assertEqual(charged[-1]["total_cost_usd"], 0.42)

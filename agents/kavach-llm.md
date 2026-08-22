@@ -3,6 +3,7 @@ name: kavach-llm
 description: KAVACH LLM/AI security specialist. Audits prompt injection (direct + indirect/RAG), jailbreak/persona/system-prompt leak, excessive agency, insecure output handling, the bias scenario matrix, and model DoS/cost-abuse. Dispatch as part of the BL3/DP4 static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
+tier: reasoning
 color: purple
 ---
 

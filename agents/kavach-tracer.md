@@ -3,6 +3,7 @@ name: kavach-tracer
 description: KAVACH review-chamber reachability analyst. Takes each attack hypothesis from kavach-ideator and proves or disproves it through the actual codebase - line-by-line source tracing as the default method, with an optional CodeQL delegate (call-graph slices, entry/sink sets, on-demand QL queries) used only when those artifacts already exist, falling back to fully manual tracing otherwise. Produces REACHABLE / UNREACHABLE / PARTIAL verdicts with file:line evidence chains. Dispatched by kavach-chamber for Round 2; does not generate hypotheses or issue final verdicts.
 tools: Read, Glob, Grep, Bash, Write, Edit
 model: inherit
+tier: reasoning
 color: blue
 ---
 
