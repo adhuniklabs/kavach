@@ -285,6 +285,15 @@ class TestAgentAuthoredResults(unittest.TestCase):
         drafts = os.listdir(os.path.join(self.dir, "findings-draft"))
         self.assertEqual(len(drafts), 1)
 
+    def test_a_status_result_with_no_findings_is_not_corrupt(self):
+        """BL4's probe writes a protocol status object, not a findings envelope. Quarantining
+        it left the phase re-planning a dispatch that had already done its work."""
+        path = os.path.join(self.dir, "runs", "lt2", "kavach-probe.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"agent": "kavach-probe", "status": "complete", "loops": 2}, fh)
+        written, skipped = dispatch.ingest(self.dir, "LT2", path)
+        self.assertEqual((written, skipped), (0, 0))
+
     def test_attribution_survives_a_fan_out_index(self):
         self.assertEqual(dispatch.agent_from_result("/a/runs/bl3/kavach-sast-3.json"),
                          "kavach-sast")

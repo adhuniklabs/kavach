@@ -22,12 +22,17 @@ every existing test built its findings in Python rather than parsing one a model
   result, and lost the six correct findings beside it. Unknown keys are now dropped the same way
   `id` already was — the author does not get to decide the shape. The schema doc says so, so a
   model knows that inventing a field loses the content rather than adding it.
+- **A result with no `findings` key is not corrupt.** BL4's probe writes a protocol status
+  object rather than a findings envelope, and `ingest` raised `KeyError` on it — so the phase
+  kept re-planning a dispatch that had already done its work. `ingest` reads its own results
+  tolerantly now; `findings.json` keeps the strict read, because a missing key *there* is an
+  engine bug rather than an agent's choice of shape.
 - **A result that omits `source` is attributed to its own dispatch.** `ingest` reads the agent
   back off the result filename the engine itself chose. This is not cosmetic: `triage.classify`
   marks a finding `reasoned` only when a source segment names an agent, and only `reasoned`
   findings are promotable — so an unattributed finding was silently unpromotable.
 
-627 tests (was 622), corpus gate passes.
+628 tests (was 622), corpus gate passes.
 
 ## [0.2.0] - 2026-08-23
 
