@@ -3,6 +3,55 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.2] - 2026-08-24
+
+A patch, not a contract change: an audit written by 0.2.0 or 0.2.1 still resumes here. Everything
+below was found by driving the engine from a real harness against a real tree, not from fixtures.
+
+### `balanced` was not runnable from a fresh audit directory
+
+`recon` writes `recon.json` and `file-manifest.txt`; `sweep` is the **only** verb that writes
+`findings.json`. Almost everything downstream reads one of those — `scope` ranks the manifest, and
+`slice`, `triage` and `render` all read `findings.json`. `lite` opens with `core:recon` and
+`core:sweep` and so prepares itself; `balanced`, `deep`, `diff`, `longshot` and `revisit` schedule
+neither, and nothing said so anywhere a harness could read it.
+
+Driven without them, `balanced` sent all eight BL3 hunters an empty slice and then died in its
+report tail on a `findings.json` nothing had written.
+
+- **`plan --json` reports `prerequisites`** — the deterministic passes this mode needs, does not
+  schedule, and does not already have on disk. Empty for `lite`; two entries for a fresh
+  `balanced`. Keyed on the artifacts rather than the mode, so it empties as they appear and a
+  resume re-walks nothing.
+- **`modes.missing_prerequisites(audit_dir, mode)`** is the same answer as a function, and a test
+  asserts the invariant across every mode in `MODE_PHASES`: each one either schedules a
+  deterministic pass or declares it. No mode can silently need an artifact again.
+- **SKILL.md** stated this for `longshot` and `revisit` only, and only for `recon`. The note now
+  covers any mode that does not schedule them, and names `sweep` as the sole source of
+  `findings.json`.
+
+### The code graph was never available on a repository nobody had indexed by hand
+
+`codegraph index <target>` refreshes an existing index and refuses to create the first one — it
+exits 1 with "Run codegraph init first". `graph index` called it unconditionally, so it recorded
+`available: false` for every unindexed target: a silent fall back to grep on exactly the trees
+where a graph pays for itself. One hunter without a graph on a 25k-file tree measured $0.199 and
+37 turns.
+
+`status --json` reports `initialized`, so that picks the verb: `init` to build, `index` to refresh.
+An unreadable status falls back to `init`, because guessing that way costs a rebuild and guessing
+the other way costs the graph. `--quiet` is `index`'s alone; `init` rejects it. The stubs modelled
+neither refusal and now do.
+
+Verified against the real codegraph 1.5.0: `init` builds 428 files / 8,389 nodes / 20,440 edges in
+1.3s, and `graph index` then writes `available: true`.
+
+### Also
+
+- `karya-module.json` declares kavach as a karya module — one file, no code (#6).
+
+638 tests (was 628), corpus gate passes.
+
 ## [0.2.1] - 2026-08-23
 
 A patch, not a contract change: an audit written by 0.2.0 still resumes here.

@@ -476,7 +476,7 @@ def _snapshot_findings_baseline(out: str, commit: str | None) -> str | None:
 
 
 def cmd_plan(args) -> int:
-    from . import dispatch, runner
+    from . import dispatch, modes, runner
     out = _out_dir(args)
     phases = runner.next_actionable(out, args.mode)
     if not args.json:
@@ -487,6 +487,11 @@ def cmd_plan(args) -> int:
         "mode": args.mode,
         "audit_dir": out,
         "target": os.path.abspath(args.target),
+        # The deterministic passes this mode does not schedule and does not have. Empty for
+        # `lite`, which opens with core:recon and core:sweep; two entries for a fresh
+        # `balanced`, whose phase list is all agent phases and whose hunters, slices and
+        # report tail all read what recon and sweep write.
+        "prerequisites": modes.missing_prerequisites(out, args.mode),
         "actionable": [dispatch.dispatch_plan(args.mode, p, out, args.target) for p in phases],
     }, indent=2))
     return 0
