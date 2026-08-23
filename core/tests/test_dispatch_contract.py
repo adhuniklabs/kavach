@@ -10,7 +10,7 @@ import os
 import tempfile
 import unittest
 
-from kavach import agentdefs, dispatch, modes, paths, slicing
+from kavach import agentdefs, dispatch, modes, paths, slicing, triage
 from kavach.finding import Finding, Location, Severity
 
 AGENT_PHASES = [(m, p) for m, phases in modes.MODE_PHASES.items() for p in phases
@@ -245,3 +245,68 @@ class TestPaths(unittest.TestCase):
         self.assertTrue(paths.reference("persona.md"))
         self.assertTrue(paths.reference("domains/sast.md"))
         self.assertIsNone(paths.reference("nope.md"))
+
+
+class TestAgentAuthoredResults(unittest.TestCase):
+    """A subagent hand-writes its result file, so the contract has to survive a model.
+
+    Two failures cost a whole LT2 dispatch before these existed: `finding-schema.md`'s own
+    example omitted `source`, which `Finding` requires, so no agent following the documented
+    contract could produce an ingestible file; and one invented key raised, which quarantined
+    the file and lost the six findings beside it.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.dir, "runs", "lt2"))
+
+    def _result(self, name, findings):
+        path = os.path.join(self.dir, "runs", "lt2", name)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"domain": "sast", "controls": {}, "findings": findings}, fh)
+        return path
+
+    def test_the_documented_example_ingests(self):
+        example = _schema_example()
+        Finding.from_dict(example)
+
+    def test_an_invented_key_is_dropped_not_fatal(self):
+        f = Finding.from_dict({"title": "t", "severity": "high", "category": "A01",
+                               "source": "kavach-sast", "exploitability": "trivial"})
+        self.assertEqual(f.title, "t")
+        self.assertFalse(hasattr(f, "exploitability"))
+
+    def test_a_result_without_source_is_attributed_to_its_dispatch(self):
+        path = self._result("kavach-sast.json", [
+            {"title": "Hardcoded key", "severity": "critical", "category": "A07:Secrets",
+             "locations": [{"file": "server.js", "line": 7}]}])
+        written, _ = dispatch.ingest(self.dir, "LT2", path)
+        self.assertEqual(written, 1)
+        drafts = os.listdir(os.path.join(self.dir, "findings-draft"))
+        self.assertEqual(len(drafts), 1)
+
+    def test_attribution_survives_a_fan_out_index(self):
+        self.assertEqual(dispatch.agent_from_result("/a/runs/bl3/kavach-sast-3.json"),
+                         "kavach-sast")
+        self.assertEqual(dispatch.agent_from_result("/a/runs/lt2/kavach-sast.json"),
+                         "kavach-sast")
+
+    def test_an_unattributed_finding_stays_promotable(self):
+        f = Finding.from_dict({"title": "t", "severity": "high", "category": "A01"},
+                              source="kavach-sast")
+        self.assertEqual(triage.classify(f), "reasoned")
+
+
+def _schema_example() -> dict:
+    """The `findings[0]` object out of `finding-schema.md`, parsed from the doc itself.
+
+    Read rather than copied: a schema doc that drifts from the dataclass is exactly the
+    defect this pins, and a copy here would drift with it.
+    """
+    doc = paths.reference("finding-schema.md")
+    if doc is None:
+        raise unittest.SkipTest("references/ not installed beside the core")
+    with open(doc, encoding="utf-8") as fh:
+        body = fh.read()
+    block = body.split("```json", 1)[1].split("```", 1)[0]
+    return json.loads(block)["findings"][0]

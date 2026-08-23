@@ -27,6 +27,7 @@ A JSON file `agent-<domain>.json` (e.g. `agent-billing.json`) in the `.kavach` d
       "title": "Client-controlled price honored at checkout",
       "severity": "critical",
       "category": "Billing-Bypass",
+      "source": "kavach-billing",
       "confidence": "confirmed",
       "cvss_score": 9.1,
       "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
@@ -48,6 +49,9 @@ A JSON file `agent-<domain>.json` (e.g. `agent-billing.json`) in the `.kavach` d
 ### Field rules
 
 - **severity**: `critical | high | medium | low | info` - from CVSS band (§ severity-model). Never inflate/deflate.
+- **source**: your own agent name (`kavach-sast`, `kavach-billing`, …). This is what marks the
+  finding as reasoned rather than scanner output, and only reasoned findings are promotable.
+  Omit it and the engine attributes it to your dispatch for you - but say it.
 - **confidence**: `confirmed` only if you read the enforcing/violating line. Else `suspected`.
 - **category**: OWASP/CWE tag (`A01`, `API1:BOLA`, `LLM01`, `Billing-Bypass`, `A07:Secrets`, …).
 - **locations**: at least one `{file, line}`. `file` is repo-relative. Cite every location.
@@ -55,6 +59,10 @@ A JSON file `agent-<domain>.json` (e.g. `agent-billing.json`) in the `.kavach` d
 - **remediation**: copy-pasteable fix for *this* codebase (show the diff), not generic advice.
 - **kill_chain** (optional): one of `steal-keys`, `free-chatbot`, `bypass-billing`, `mint-tokens`,
   `read-others-data`, `hijack-ai` when the finding is a step in that attack tree.
+
+**Fields not on this list are dropped.** The schema is the whole contract - an extra key you
+invented (`exploitability`, `classification`, `control_status`) is discarded on ingest, so
+whatever you put there is simply lost. Put it in `what_it_is` or `how_exploited` instead.
 
 ## Control booleans (feed the production-readiness gate)
 

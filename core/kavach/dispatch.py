@@ -141,6 +141,17 @@ def quarantine(audit_dir: str, result_path: str) -> str:
     return dest
 
 
+def agent_from_result(result_path: str) -> str:
+    """The dispatch that authored a result file, read back off the name the engine gave it.
+
+    ``result_path`` writes ``<agent>.json`` or ``<agent>-<i>.json``, so the inverse is the
+    stem minus a fan-out index. Used to attribute findings whose author did not name
+    itself - see :meth:`Finding.from_dict`.
+    """
+    stem = os.path.splitext(os.path.basename(result_path))[0]
+    return re.sub(r"-\d+$", "", stem)
+
+
 def ingest(audit_dir: str, phase: str, result_path: str) -> tuple[int, int]:
     """Fold one result file into drafts. Returns (written, skipped-as-already-present).
 
@@ -149,7 +160,7 @@ def ingest(audit_dir: str, phase: str, result_path: str) -> tuple[int, int]:
     drafts sequentially made that produce a second copy of every finding, which then reached
     the report as inflated counts.
     """
-    findings = load_findings(result_path)
+    findings = load_findings(result_path, source=agent_from_result(result_path))
     # fan-out phases (BL3/DP4, LS2, ...) ingest several concurrent dispatches under the
     # same phase id; without a lock, two processes can read the same next-draft-number
     # before either writes, and the second write clobbers the first's draft. The same lock
