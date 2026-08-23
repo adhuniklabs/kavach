@@ -14,28 +14,49 @@ import unittest
 
 from kavach import dispatch, graphindex, scoping
 
+# Every stub answers `status` the way the real CLI does - with `initialized` - because
+# that flag is what picks the verb. `index` refuses to create a first index and `init`
+# rejects `--quiet`, so a stub that accepts either verb with any flags hides both.
 STUB_OK = """#!/bin/sh
+echo "$@" >> "$CG_CALLS"
 case "$1" in
   version) echo "codegraph 9.9.9" ;;
   index)   echo "indexed" ;;
-  status)  echo '{"symbols": 1234, "files": 56}' ;;
+  status)  echo '{"initialized": true, "symbols": 1234, "files": 56}' ;;
   *)       exit 1 ;;
 esac
 """
 
 STUB_INDEX_FAILS = """#!/bin/sh
+echo "$@" >> "$CG_CALLS"
 case "$1" in
   version) echo "codegraph 9.9.9" ;;
   index)   echo "cannot read target" >&2; exit 3 ;;
+  status)  echo '{"initialized": true}' ;;
   *)       exit 1 ;;
 esac
 """
 
 STUB_NO_JSON_STATUS = """#!/bin/sh
+echo "$@" >> "$CG_CALLS"
 case "$1" in
   version) echo "codegraph 9.9.9" ;;
-  index)   echo "indexed" ;;
+  init)    echo "initialized" ;;
   status)  echo "Symbols: 1234 (not json)" ;;
+  *)       exit 1 ;;
+esac
+"""
+
+# The real 1.5.0 contract on a tree nobody has indexed: `index` exits 1 telling you to
+# run `init`, and `init` does not take `--quiet`.
+STUB_UNINDEXED = """#!/bin/sh
+echo "$@" >> "$CG_CALLS"
+case "$1" in
+  version) echo "codegraph 9.9.9" ;;
+  status)  echo '{"initialized": false}' ;;
+  init)    for a in "$@"; do [ "$a" = "--quiet" ] && { echo "unknown option" >&2; exit 2; }; done
+           echo "indexed" ;;
+  index)   echo "Run codegraph init first" >&2; exit 1 ;;
   *)       exit 1 ;;
 esac
 """
@@ -56,9 +77,23 @@ class TestGraphIndex(unittest.TestCase):
         self.target = tempfile.mkdtemp()
         self._path = os.environ["PATH"]
         os.environ["PATH"] = self.bin_dir + os.pathsep + self._path
+        self.calls = os.path.join(self.bin_dir, "calls")
+        os.environ["CG_CALLS"] = self.calls
 
     def tearDown(self):
         os.environ["PATH"] = self._path
+        os.environ.pop("CG_CALLS", None)
+
+    def _verbs(self) -> list[str]:
+        """The first word of every stub invocation, in order."""
+        if not os.path.exists(self.calls):
+            return []
+        with open(self.calls, encoding="utf-8") as fh:
+            return [line.split()[0] for line in fh if line.strip()]
+
+    def _argv_for(self, verb: str) -> list[str]:
+        with open(self.calls, encoding="utf-8") as fh:
+            return next(line.split() for line in fh if line.split()[:1] == [verb])
 
     def test_a_missing_binary_is_recorded_not_raised(self):
         """The graph is a scanner, not a prerequisite: no binary must not block a phase."""
@@ -92,10 +127,43 @@ class TestGraphIndex(unittest.TestCase):
         self.assertNotIn("statistics", status)
 
     def test_a_timeout_is_unavailable_rather_than_a_hang(self):
-        _stub(self.bin_dir, "#!/bin/sh\ncase \"$1\" in index) sleep 5 ;; *) exit 1 ;; esac\n")
+        _stub(self.bin_dir, "#!/bin/sh\ncase \"$1\" in"
+                            " status) echo '{\"initialized\": true}' ;;"
+                            " index) sleep 5 ;; *) exit 1 ;; esac\n")
         status = graphindex.index(self.target, self.dir, timeout=1)
         self.assertFalse(status["available"])
         self.assertIn("124", status["reason"])
+
+    def test_an_unindexed_tree_is_bootstrapped_with_init(self):
+        """`index` refuses to create a first index - it exits 1 and tells you to run
+        `init`. Almost every repository an audit is pointed at has never been indexed, so
+        calling `index` unconditionally meant the graph was never available on a first
+        run: a silent degrade to grep on the repositories that need it most."""
+        _stub(self.bin_dir, STUB_UNINDEXED)
+        status = graphindex.index(self.target, self.dir)
+        self.assertTrue(status["available"])
+        self.assertIn("init", self._verbs())
+        self.assertNotIn("index", self._verbs())
+
+    def test_init_is_not_given_the_quiet_flag_that_only_index_accepts(self):
+        _stub(self.bin_dir, STUB_UNINDEXED)
+        graphindex.index(self.target, self.dir)
+        self.assertNotIn("--quiet", self._argv_for("init"))
+
+    def test_an_already_indexed_tree_is_refreshed_with_index(self):
+        """The cheaper verb where it is the correct one - `init` rebuilds from scratch."""
+        _stub(self.bin_dir, STUB_OK)
+        status = graphindex.index(self.target, self.dir)
+        self.assertTrue(status["available"])
+        self.assertIn("index", self._verbs())
+        self.assertNotIn("init", self._verbs())
+
+    def test_an_unreadable_status_falls_back_to_init(self):
+        """Guessing "not indexed" costs a rebuild; guessing the other way costs the
+        graph, because `index` would refuse and nothing would be built."""
+        _stub(self.bin_dir, STUB_NO_JSON_STATUS)
+        self.assertTrue(graphindex.index(self.target, self.dir)["available"])
+        self.assertIn("init", self._verbs())
 
     def test_status_of_an_untouched_audit_dir_is_not_available(self):
         self.assertFalse(graphindex.available(self.dir))

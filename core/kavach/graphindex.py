@@ -61,6 +61,15 @@ def _statistics(binary: str, target: str, timeout: int = 60) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _initialized(binary: str, target: str, timeout: int = 60) -> bool:
+    """Whether the target already carries an index, which decides the verb below.
+
+    A missing or unreadable answer means "not initialized", because `init` builds an index
+    either way and `index` refuses without one - so guessing wrong in this direction costs
+    a rebuild, and wrong in the other costs the graph."""
+    return bool(_statistics(binary, target, timeout=timeout).get("initialized"))
+
+
 def status_path(audit_dir: str) -> str:
     return os.path.join(os.path.abspath(audit_dir), STATUS_ARTIFACT)
 
@@ -97,13 +106,21 @@ def index(target: str, audit_dir: str, *, binary: str = BINARY, force: bool = Fa
             "hint": "https://github.com/colbymchenry/codegraph - hunters fall back to grep",
         })
 
-    argv = [found, "index", target, "--quiet"] + (["--force"] if force else [])
+    # `index` rebuilds an existing index and *refuses* to create the first one: on a tree
+    # with no `.codegraph/` it exits 1 with "Run codegraph init first" rather than
+    # bootstrapping. Since almost every repository an audit is pointed at has never been
+    # indexed, calling `index` unconditionally meant the graph was never available on a
+    # first run - a silent degrade to grep on exactly the repositories that need it most.
+    # `--quiet` is `index`'s alone; `init` rejects it as an unknown option.
+    verb = "index" if _initialized(found, target) else "init"
+    argv = [found, verb, target] + (["--quiet"] if verb == "index" else []) \
+        + (["--force"] if force else [])
     started = time.time()
     code, _, err = _run(argv, timeout=timeout, cwd=target)
     elapsed = round(time.time() - started, 1)
     if code != 0:
         return write_and_return(audit_dir, {
-            "available": False, "reason": f"{binary} index exited {code}",
+            "available": False, "reason": f"{binary} {verb} exited {code}",
             "detail": err.strip()[:500], "elapsed_seconds": elapsed,
         })
 
