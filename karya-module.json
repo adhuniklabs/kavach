@@ -1,0 +1,44 @@
+{
+  "$schema": "https://karya.thevibemanager.com/schema/module-v1.json",
+  "spec": 1,
+
+  "id": "security",
+  "name": "KAVACH Security Audit",
+  "version": "0.2.1",
+  "description": "Zero-input adversarial security audit — VAPT-grade, fail-closed.",
+  "author": { "name": "Adhunik Labs", "url": "https://github.com/adhuniklabs" },
+  "license": "MIT",
+  "keywords": ["security", "vapt", "sast", "audit"],
+  "homepage": "https://github.com/adhuniklabs/kavach",
+
+  "karya": ">=0.2.0",
+
+  "agents": "./agents",
+  "references": "./skill/references",
+  "modes": [
+    { "id": "lite", "label": "Fast triage — secrets, SAST, PoC", "default": false },
+    { "id": "balanced", "label": "Full audit — 8 hunters, chamber, report", "default": true },
+    { "id": "deep", "label": "Adversarial — authz, state, cold re-verification", "default": false },
+    { "id": "diff", "label": "Only what changed since the last audit", "default": false }
+  ],
+
+  "engine": {
+    "kind": "python",
+    "install": { "dir": "./core", "extras": ["report"] },
+    "command": ["-m", "kavach"],
+    "driver": "kavach"
+  },
+
+  "requires": {
+    "python": ">=3.9",
+    "commands": [
+      { "name": "docker", "level": "degrades", "why": "11 of 14 scanners; the builtin secrets and offline SAST rules still run" },
+      { "name": "codegraph", "level": "degrades", "why": "graph-first discovery; hunters fall back to grep and cost more" },
+      { "name": "git", "level": "degrades", "why": "the baseline snapshot, and diff mode" },
+      { "name": "gh", "level": "optional", "why": "the opt-in issue export" }
+    ],
+    "inference": { "tiers": ["reasoning", "mechanical", "triage"] }
+  },
+
+  "output": { "dir": ".kavach", "gitignore": true, "reports": "reports/" }
+}
