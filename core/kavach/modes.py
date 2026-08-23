@@ -7,6 +7,8 @@ docs/phase-reference.md; nothing else in the tree may redeclare a phase id.
 
 from __future__ import annotations
 
+import os
+
 MODE_PHASES: dict[str, list[str]] = {
     "lite": ["LT0", "LT1", "LT2", "LT3", "LT4"],
     "balanced": ["BL1", "BL2", "BL3", "BL4", "BL5", "BL6", "BL6b", "BL6c", "BL7"],
@@ -176,6 +178,39 @@ def prereqs_for(mode: str, phase: str) -> list[str]:
 
 def gate_for(phase: str) -> list[str]:
     return list(PHASE_GATES.get(phase, []))
+
+
+# --- the deterministic passes a mode may not schedule for itself -----------------------
+#
+# `recon` walks the tree and writes `recon.json` + `file-manifest.txt`. `sweep` runs the
+# scanners and is the *only* verb that writes `findings.json`. Almost everything downstream
+# reads one of those: `scope` ranks the manifest, and `slice`, `triage` and `render` all
+# read findings.json.
+#
+# `lite` opens with `core:recon` and `core:sweep`, so it prepares itself. `balanced`, `deep`,
+# `longshot` and `revisit` list neither. SKILL.md tells an orchestrator to run recon up front
+# for the two modes it names, but the requirement is not special to them and it is not only
+# recon - a `balanced` run driven without a sweep sends every hunter an empty slice and then
+# fails in its report tail on a findings.json nothing wrote.
+#
+# Reported as data rather than left in prose, so a harness does not have to carry the list.
+PREREQ_ARTIFACTS: tuple[tuple[str, str, str], ...] = (
+    ("recon", "recon.json", "core:recon"),
+    ("sweep", "findings.json", "core:sweep"),
+)
+
+
+def missing_prerequisites(audit_dir: str, mode: str) -> list[dict]:
+    """Which deterministic passes this mode needs, does not schedule, and does not have."""
+    scheduled = {PHASE_AGENT.get(p, "") for p in phases_for(mode)}
+    missing = []
+    for verb, artifact, executor in PREREQ_ARTIFACTS:
+        if executor in scheduled:
+            continue
+        if os.path.exists(os.path.join(os.path.abspath(audit_dir), artifact)):
+            continue
+        missing.append({"verb": verb, "artifact": artifact})
+    return missing
 
 
 # --- the dispatch contract -------------------------------------------------------------

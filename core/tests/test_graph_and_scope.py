@@ -12,7 +12,7 @@ import stat
 import tempfile
 import unittest
 
-from kavach import dispatch, graphindex, scoping
+from kavach import dispatch, graphindex, modes, scoping
 
 # Every stub answers `status` the way the real CLI does - with `initialized` - because
 # that flag is what picks the verb. `index` refuses to create a first index and `init`
@@ -340,3 +340,54 @@ class TestSignalMatching(unittest.TestCase):
             "app/agents/_shared/prompts.py",
         ], "kavach-llm")
         self.assertEqual(ranked[0]["path"], "app/agents/_shared/prompts.py")
+
+
+class TestModePrerequisites(unittest.TestCase):
+    """`balanced` was never runnable from a fresh audit dir, and nothing said so.
+
+    `recon` writes recon.json and file-manifest.txt; `sweep` is the only verb that writes
+    findings.json. `scope` ranks the manifest and `slice`, `triage` and `render` all read
+    findings.json - so a mode whose phase list schedules neither needs both run up front.
+    `lite` opens with core:recon and core:sweep. balanced, deep, diff, longshot and revisit
+    do not, and driving balanced without them sent eight hunters empty slices and then died
+    in the report tail.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+
+    def test_lite_schedules_its_own_and_needs_nothing_up_front(self):
+        self.assertEqual(modes.missing_prerequisites(self.dir, "lite"), [])
+
+    def test_balanced_needs_both_on_a_fresh_audit_dir(self):
+        self.assertEqual(
+            [p["verb"] for p in modes.missing_prerequisites(self.dir, "balanced")],
+            ["recon", "sweep"],
+        )
+
+    def test_deep_needs_them_too(self):
+        self.assertTrue(modes.missing_prerequisites(self.dir, "deep"))
+
+    def test_an_artifact_already_on_disk_is_not_asked_for_again(self):
+        """Idempotent, so a resume does not re-walk the tree or re-run the scanners."""
+        with open(os.path.join(self.dir, "recon.json"), "w", encoding="utf-8") as fh:
+            fh.write("{}")
+        self.assertEqual(
+            [p["verb"] for p in modes.missing_prerequisites(self.dir, "balanced")], ["sweep"]
+        )
+
+    def test_every_mode_either_schedules_them_or_declares_them(self):
+        """The invariant a harness can rely on: no mode silently needs an artifact."""
+        for mode in modes.MODE_PHASES:
+            scheduled = {modes.PHASE_AGENT.get(p, "") for p in modes.phases_for(mode)}
+            declared = {p["verb"] for p in modes.missing_prerequisites(self.dir, mode)}
+            for verb, _artifact, executor in modes.PREREQ_ARTIFACTS:
+                self.assertTrue(
+                    executor in scheduled or verb in declared,
+                    f"{mode} neither schedules nor declares {verb}",
+                )
+
+    def test_the_plan_carries_them_so_a_harness_need_not_hardcode_the_list(self):
+        plan = dispatch.dispatch_plan("balanced", "BL1", self.dir, "/repo")
+        self.assertEqual(plan["phase"], "BL1")           # unchanged shape
+        self.assertEqual(modes.missing_prerequisites(self.dir, "balanced")[0]["verb"], "recon")

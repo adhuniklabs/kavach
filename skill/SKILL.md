@@ -147,10 +147,30 @@ and writes `attack-surface/scope-<agent>.json`, which `phase-prompt` then names 
 where to start, not a boundary: `file-manifest.txt` still holds everything and no hunter is stopped
 from opening a file the ranking missed.
 
-`longshot` mode's LS1 (`core:enumerate`) reads `$AUDIT/file-manifest.txt`, which only exists after a
-recon pass. `revisit` mode's render tail needs `$AUDIT/recon.json` for the same reason. On a fresh
-run of either mode (no prior `K recon` in this audit dir), run `K recon "$TARGET" --out "$AUDIT"`
-once, up front, before the phase loop starts. `revisit` additionally has nothing to revisit without
+**Run the deterministic passes up front for any mode that does not schedule them.** `lite` opens
+with `LT0 (core:recon)` and `LT1 (core:sweep)`, so it prepares itself. `balanced`, `deep`, `diff`,
+`longshot` and `revisit` schedule neither, and almost everything downstream reads what those two
+write: `scope` ranks `file-manifest.txt`, and `slice`, `triage` and `render` all read
+`findings.json` - which **`sweep` is the only verb that creates**. A `balanced` run driven without
+them sends every hunter an empty slice and then dies in its report tail on a `findings.json`
+nothing wrote.
+
+`K plan --json` reports this so a harness does not have to carry the list:
+
+```jsonc
+"prerequisites": [ {"verb": "recon", "artifact": "recon.json"},
+                   {"verb": "sweep", "artifact": "findings.json"} ]   // empty for lite
+```
+
+It is keyed on the artifacts, not the mode, so it empties as they appear and a resume re-walks
+nothing. On a fresh run of such a mode:
+
+```bash
+K recon "$TARGET" --out "$AUDIT"
+K sweep "$TARGET" --out "$AUDIT"
+```
+
+`revisit` additionally has nothing to revisit without
 a *prior* completed KAVACH audit's durable context (a findings baseline, kill-chains, controls) for
 this target - if that's genuinely absent, tell the operator revisit needs a prior audit to revisit
 and stop; do not silently run a from-scratch audit under the revisit label.
