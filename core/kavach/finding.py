@@ -12,7 +12,7 @@ import hashlib
 import json
 import os
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, fields, asdict
 from enum import Enum
 from typing import Any
 
@@ -111,17 +111,31 @@ class Finding:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Finding":
-        d = dict(d)
+    def from_dict(cls, d: dict[str, Any], *, source: str = "") -> "Finding":
+        """Build a Finding from a raw dict, dropping keys the model does not have.
+
+        A subagent authors its result file by hand, and one invented field used to raise
+        and quarantine the whole file - six good findings lost to a seventh key. Unknown
+        keys are dropped here for the same reason ``id`` is: the caller does not get to
+        decide the shape.
+
+        ``source`` is the producing dispatch, used when the result omits it. It is not
+        cosmetic: ``triage.classify`` promotes a finding only when a source segment says
+        an agent authored it, so an unattributed finding silently becomes unpromotable.
+        """
+        known = {f.name for f in fields(cls)}
+        d = {k: v for k, v in d.items() if k in known}
         d.pop("id", None)  # always re-derive
+        if not d.get("source"):
+            d["source"] = source
         return cls(**d)
 
 
-def load_findings(path: str) -> list[Finding]:
+def load_findings(path: str, *, source: str = "") -> list[Finding]:
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     rows = data["findings"] if isinstance(data, dict) else data
-    return [Finding.from_dict(r) for r in rows]
+    return [Finding.from_dict(r, source=source) for r in rows]
 
 
 def dump_findings(findings: list[Finding], path: str, meta: dict[str, Any] | None = None) -> None:

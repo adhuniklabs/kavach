@@ -3,6 +3,37 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.1] - 2026-08-23
+
+A patch, not a contract change: an audit written by 0.2.0 still resumes here.
+
+### The agent result contract was unsatisfiable
+
+Driving a real LT2 dispatch through a harness found two defects that fixtures could not, because
+every existing test built its findings in Python rather than parsing one a model wrote.
+
+- **`finding-schema.md`'s own example did not ingest.** The example object omitted `source`,
+  which `Finding` requires — so an agent that followed the documented contract exactly produced
+  a file the engine quarantined. The example now carries `source`, the field rules explain what
+  it is for, and a test parses the example out of the document and ingests it, so the doc and
+  the dataclass cannot drift apart again.
+- **One invented key threw away the whole file.** `Finding.from_dict` did `cls(**d)`, so a single
+  hallucinated field (`exploitability`, `classification`) raised `TypeError`, quarantined the
+  result, and lost the six correct findings beside it. Unknown keys are now dropped the same way
+  `id` already was — the author does not get to decide the shape. The schema doc says so, so a
+  model knows that inventing a field loses the content rather than adding it.
+- **A result with no `findings` key is not corrupt.** BL4's probe writes a protocol status
+  object rather than a findings envelope, and `ingest` raised `KeyError` on it — so the phase
+  kept re-planning a dispatch that had already done its work. `ingest` reads its own results
+  tolerantly now; `findings.json` keeps the strict read, because a missing key *there* is an
+  engine bug rather than an agent's choice of shape.
+- **A result that omits `source` is attributed to its own dispatch.** `ingest` reads the agent
+  back off the result filename the engine itself chose. This is not cosmetic: `triage.classify`
+  marks a finding `reasoned` only when a source segment names an agent, and only `reasoned`
+  findings are promotable — so an unattributed finding was silently unpromotable.
+
+628 tests (was 622), corpus gate passes.
+
 ## [0.2.0] - 2026-08-23
 
 **Breaking for anything driving the engine.** `dispatch.ingest` returns `(written, skipped)`

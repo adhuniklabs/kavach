@@ -7,6 +7,7 @@ The engine composes prompts and folds results; SKILL.md issues the Task calls.
 from __future__ import annotations
 
 import glob
+import json
 import os
 import re
 import time
@@ -16,7 +17,7 @@ import yaml
 from filelock import FileLock
 
 from . import graphindex, modes, paths, scoping
-from .finding import load_findings
+from .finding import Finding
 from .findings_tree import slugify, write_draft
 
 
@@ -141,6 +142,31 @@ def quarantine(audit_dir: str, result_path: str) -> str:
     return dest
 
 
+def agent_from_result(result_path: str) -> str:
+    """The dispatch that authored a result file, read back off the name the engine gave it.
+
+    ``result_path`` writes ``<agent>.json`` or ``<agent>-<i>.json``, so the inverse is the
+    stem minus a fan-out index. Used to attribute findings whose author did not name
+    itself - see :meth:`Finding.from_dict`.
+    """
+    stem = os.path.splitext(os.path.basename(result_path))[0]
+    return re.sub(r"-\d+$", "", stem)
+
+
+def load_agent_findings(result_path: str) -> list[Finding]:
+    """The findings in one agent-authored result, attributed to the dispatch that wrote it.
+
+    A result with no ``findings`` key is not corrupt: BL4's probe result is a protocol status
+    object, and quarantining it left the phase re-planning a dispatch that had already done its
+    work. `findings.json` keeps the strict read - a missing key *there* is an engine bug.
+    """
+    with open(result_path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    rows = data.get("findings", []) if isinstance(data, dict) else data
+    source = agent_from_result(result_path)
+    return [Finding.from_dict(r, source=source) for r in rows]
+
+
 def ingest(audit_dir: str, phase: str, result_path: str) -> tuple[int, int]:
     """Fold one result file into drafts. Returns (written, skipped-as-already-present).
 
@@ -149,7 +175,7 @@ def ingest(audit_dir: str, phase: str, result_path: str) -> tuple[int, int]:
     drafts sequentially made that produce a second copy of every finding, which then reached
     the report as inflated counts.
     """
-    findings = load_findings(result_path)
+    findings = load_agent_findings(result_path)
     # fan-out phases (BL3/DP4, LS2, ...) ingest several concurrent dispatches under the
     # same phase id; without a lock, two processes can read the same next-draft-number
     # before either writes, and the second write clobbers the first's draft. The same lock
