@@ -32,11 +32,20 @@ def make_run_dir(audit_dir: str, phase: str, audit_id: str, attempt: int) -> str
     return d
 
 
-def result_path(audit_dir: str, phase: str, agent: str, *, index: int | None = None) -> str:
-    d = os.path.join(os.path.abspath(audit_dir), "runs", slugify(phase))
-    os.makedirs(d, exist_ok=True)
+def result_path_for(audit_dir: str, phase: str, agent: str, *, index: int | None = None) -> str:
+    """Where a dispatch's result belongs, without creating the directory for it.
+
+    The planner only asks whether the file is there, and a planner that makes a
+    `runs/<phase>/` on every call leaves empty directories for phases nobody ran.
+    """
     stem = slugify(agent) if index is None else f"{slugify(agent)}-{index}"
-    return os.path.join(d, f"{stem}.json")
+    return os.path.join(os.path.abspath(audit_dir), "runs", slugify(phase), f"{stem}.json")
+
+
+def result_path(audit_dir: str, phase: str, agent: str, *, index: int | None = None) -> str:
+    path = result_path_for(audit_dir, phase, agent, index=index)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return path
 
 
 def result_glob(audit_dir: str, phase: str) -> str:
