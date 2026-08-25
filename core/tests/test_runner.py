@@ -4,7 +4,7 @@ import tempfile
 import threading
 import unittest
 
-from kavach import runner, state
+from kavach import dispatch, modes, runner, state
 from kavach.state import PhaseStatus
 
 
@@ -57,6 +57,57 @@ class TestRunner(unittest.TestCase):
         _touch(self.dir, "attack-surface/advisory-summary.md")
         self.assertNotIn("BL1", runner.next_actionable(self.dir, "balanced"))
         self.assertEqual(runner.next_actionable(self.dir, "balanced")[0], "BL2")
+
+    def _reach_bl3(self):
+        """BL1 and BL2 closed, and BL3's shared gate written by whichever hunter got home."""
+        _touch(self.dir, "attack-surface/advisory-summary.md")
+        _touch(self.dir, "attack-surface/knowledge-base-report.md")
+        _touch(self.dir, "attack-surface/source-sink-flows-all-severities.md")
+
+    def _bank(self, phase, *agents):
+        roster = modes.roster_for(phase)
+        for name in agents:
+            path = dispatch.result_path(self.dir, phase, name, index=roster.index(name) + 1)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"domain": name, "controls": {}, "findings": []}, fh)
+
+    def test_fanout_stays_actionable_while_hunters_have_no_result(self):
+        # Measured on a real resume: four of BL3's eight hunters failed upstream, one of
+        # the four that succeeded wrote the shared gate artifact, and `plan` never
+        # offered BL3 again. The audit advanced to BL4 permanently missing half its
+        # static analysis, including the 62-lead supply slice.
+        self._reach_bl3()
+        self._bank("BL3", "kavach-sast", "kavach-api", "kavach-llm", "kavach-billing")
+        self.assertTrue(runner.gate_satisfied(self.dir, "BL3"))
+        self.assertEqual(
+            runner.fanout_pending(self.dir, "BL3"),
+            ["kavach-crypto", "kavach-supply", "kavach-config", "kavach-logic"],
+        )
+        self.assertIn("BL3", runner.next_actionable(self.dir, "balanced"))
+
+    def test_fanout_drops_out_once_every_hunter_has_a_result(self):
+        self._reach_bl3()
+        self._bank("BL3", *modes.roster_for("BL3"))
+        self.assertEqual(runner.fanout_pending(self.dir, "BL3"), [])
+        self.assertNotIn("BL3", runner.next_actionable(self.dir, "balanced"))
+
+    def test_incomplete_fanout_does_not_block_what_comes_after_it(self):
+        # Reported, not blocked: a hunter that can never succeed would otherwise wedge
+        # the audit, so BL3 is re-planned but BL4 stays reachable.
+        self._reach_bl3()
+        self._bank("BL3", "kavach-sast")
+        actionable = runner.next_actionable(self.dir, "balanced")
+        self.assertEqual(actionable[0], "BL3")
+        self.assertIn("BL4", actionable)
+
+    def test_single_agent_phase_is_never_treated_as_a_fanout(self):
+        # BL1 dispatches one agent and its result carries no index, so asking for a
+        # roster diff there would look for a file that is never written.
+        self.assertEqual(runner.fanout_pending(self.dir, "BL1"), [])
+
+    def test_planning_creates_no_run_directories(self):
+        runner.next_actionable(self.dir, "balanced")
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "runs", "bl3")))
 
     def test_ensure_prereqs_blocks_out_of_order(self):
         with self.assertRaises(runner.PrereqError):

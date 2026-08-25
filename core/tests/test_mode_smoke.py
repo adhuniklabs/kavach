@@ -101,6 +101,12 @@ class TestBalancedModeSmoke(unittest.TestCase):
         dump_findings([stub], agent_json)
         dispatch.ingest(self.dir, "BL3", agent_json)
         kb.write_section(self.dir, "source-sink-flows-all-severities.md", "Source-Sink Flows", "Stubbed.")
+        # BL3 fans out to eight hunters that share one gate artifact, so the artifact
+        # alone no longer closes it — every hunter needs a result. See
+        # runner.fanout_pending.
+        self.assertIn("BL3", runner.next_actionable(self.dir, "balanced"))
+        for i, name in enumerate(modes.roster_for("BL3"), start=1):
+            dump_findings([stub], dispatch.result_path(self.dir, "BL3", name, index=i))
         self.assertNotIn("BL3", runner.next_actionable(self.dir, "balanced"))
 
         kb.write_section(self.dir, "manual-attack-surface-inventory.md", "Manual Attack Surface",
