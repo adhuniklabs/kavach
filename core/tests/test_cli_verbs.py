@@ -69,6 +69,85 @@ def _fake_gh(argv, *_a, **_kw) -> subprocess.CompletedProcess:
     return subprocess.CompletedProcess(argv, 0, stdout, "")
 
 
+class TestMergeVerb(unittest.TestCase):
+    """`merge` is what puts a sub-agent's findings into the canonical set.
+
+    Measured on a full balanced audit of the leaky-node fixture: ten dispatches produced
+    24 findings covering every vulnerability the fixture has, and the report shipped three
+    hardcoded secrets — because nothing folded the agent results into findings.json and
+    `cleanup` then removed the drafts. Every finding in that report came from a scanner.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.runs = os.path.join(self.dir, "runs", "bl3")
+        os.makedirs(self.runs)
+
+    def _result(self, name: str, payload: dict) -> str:
+        path = os.path.join(self.runs, name)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh)
+        return path
+
+    def _merge(self, *extra: str):
+        buf, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(buf), redirect_stderr(err):
+            rc = main(["merge", "--extra", *extra, *_out(self.dir)])
+        return rc, err.getvalue()
+
+    def _finding(self, title: str) -> dict:
+        return {
+            "title": title,
+            "severity": "high",
+            "category": "A01",
+            "confidence": "confirmed",
+            "locations": [{"file": "server.js", "line": 26}],
+            "what_it_is": "x",
+            "how_exploited": "x",
+            "business_impact": "x",
+            "remediation": "x",
+        }
+
+    def test_folds_an_agent_result_into_the_finding_set(self):
+        path = self._result("kavach-api-2.json", {
+            "domain": "api", "controls": {}, "findings": [self._finding("IDOR on /api/accounts/:id")],
+        })
+        rc, _ = self._merge(path)
+        self.assertEqual(rc, 0)
+        merged = load_findings(os.path.join(self.dir, "findings.json"))
+        self.assertEqual([f.title for f in merged], ["IDOR on /api/accounts/:id"])
+
+    def test_attributes_a_finding_to_the_dispatch_that_wrote_it(self):
+        path = self._result("kavach-api-2.json", {
+            "domain": "api", "controls": {}, "findings": [self._finding("IDOR")],
+        })
+        self._merge(path)
+        merged = load_findings(os.path.join(self.dir, "findings.json"))
+        self.assertEqual(merged[0].source, "kavach-api")
+
+    def test_survives_a_result_that_is_a_status_object(self):
+        # BL4's probe and BL5's chamber answer with {agent, status, summary, outputs} and
+        # no `findings` key. The strict read raised KeyError there, which took every
+        # sibling result down with it.
+        status = self._result("kavach-probe.json", {
+            "agent": "kavach-probe", "status": "complete", "summary": "s", "outputs": [],
+        })
+        findings = self._result("kavach-api-2.json", {
+            "domain": "api", "controls": {}, "findings": [self._finding("IDOR")],
+        })
+        rc, _ = self._merge(status, findings)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(load_findings(os.path.join(self.dir, "findings.json"))), 1)
+
+    def test_is_idempotent_so_a_resume_does_not_double_the_set(self):
+        path = self._result("kavach-api-2.json", {
+            "domain": "api", "controls": {}, "findings": [self._finding("IDOR")],
+        })
+        self._merge(path)
+        self._merge(path)
+        self.assertEqual(len(load_findings(os.path.join(self.dir, "findings.json"))), 1)
+
+
 class TestTriageVerb(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()

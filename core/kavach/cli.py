@@ -134,11 +134,17 @@ def cmd_sweep(args) -> int:
 
 
 def cmd_merge(args) -> int:
+    from . import dispatch
     out = _out_dir(args)
     base = os.path.join(out, "findings.json")
     findings: list[Finding] = load_findings(base) if os.path.exists(base) else []
     for extra in args.extra or []:
-        findings.extend(load_findings(extra))
+        # An `--extra` is a sub-agent result, so it gets the read written for one:
+        # attributed to the dispatch that wrote it, and tolerant of a missing `findings`
+        # key. BL4's probe and BL5's chamber answer with a status object, and the strict
+        # read raised KeyError on them — which is why nothing merged agent findings at
+        # all. `findings.json` keeps the strict read; a missing key *there* is our bug.
+        findings.extend(dispatch.load_agent_findings(extra))
     from .sweep import dedupe
     merged = dedupe(findings)
     dump_findings(merged, base, meta={"phase": "merge", "version": __version__})
@@ -941,7 +947,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(sp); sp.set_defaults(func=cmd_triage)
 
     sp = sub.add_parser("merge", help="fold subagent findings into the finding set")
-    add_common(sp); sp.add_argument("--extra", nargs="*", help="extra findings JSON files")
+    add_common(sp); sp.add_argument("--extra", nargs="*", help="sub-agent result files")
     sp.set_defaults(func=cmd_merge)
 
     sp = sub.add_parser("merge-run", help="drive merge-mode phases MG1/MG5/MG6 over source audit dirs")
