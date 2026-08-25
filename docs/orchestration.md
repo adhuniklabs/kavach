@@ -184,7 +184,9 @@ it only establishes whether one exists, so `dispatch.phase_prompt` can tell an a
 it - or tell it plainly that there is none, which matters more, because an agent that assumes a
 tool it does not have burns a turn finding out. Missing binary, failed index and timeout are the
 same outcome: `available: false` with the reason, exit 0, hunters grep instead. It is a scanner,
-not a prerequisite.
+not a prerequisite. Every spawn carries `CODEGRAPH_TELEMETRY=0`: the tool reports usage home by
+default, and what it would report is the symbol graph of a tree the operator did not choose to
+publish.
 
 The graph only pays off when *every* hunter queries it. A fan-out where the lead has the graph and
 the eight sub-agents still read files pays for the index and keeps the crawl, so the graph-first
