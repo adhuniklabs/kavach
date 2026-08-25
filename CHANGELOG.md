@@ -3,6 +3,55 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.3] - 2026-08-25
+
+A patch, not a contract change: an audit written by 0.2.0, 0.2.1 or 0.2.2 still resumes here. Both
+bugs below lose work a run has already paid for, and both were found by driving `balanced` against
+real trees — neither is reachable from a stub.
+
+### A fan-out's gate artifact is not proof the fan-out finished
+
+`BL3` hands all eight domain hunters the same assigned output path, so the first one home writes the
+gate artifact and `gate_satisfied` answers true for the whole phase. Within one process a harness
+can carry its own roster ledger; that ledger dies with the process.
+
+Measured on a resumed audit of a 25,083-file tree: four hunters failed on a provider 402, one of the
+four that succeeded wrote the gate, and on resume `plan` never offered BL3 again — it went straight
+to BL4. The audit advanced toward certification permanently missing half its static analysis,
+including `kavach-supply`, whose slice held 62 of the audit's 158 leads. Nothing reported the gap.
+
+- **`runner.fanout_pending(audit_dir, phase)`** diffs the roster against `runs/<phase>/*.json`, and
+  `next_actionable` keeps a phase open while any member has no result.
+- Deliberately **not** consulted by `phase_status`, so an incomplete fan-out is re-planned without
+  blocking the phases after it. A hunter that can never succeed would otherwise wedge the audit, and
+  this engine reports rather than blocks — `coverage` is where the shortfall belongs.
+- **`dispatch.result_path_for`** is `result_path` without the `mkdir`: a planner that only asks
+  whether a file exists should not leave a `runs/<phase>/` behind for every phase it considered.
+- `cleanup` keeps `runs` (it is in `DURABLE`), so a completed audit stays complete.
+
+### `merge --extra` is a sub-agent result, so it is read like one
+
+`merge` read every `--extra` with `load_findings`, the strict reader written for `findings.json`,
+which requires a `findings` key and attributes nothing. BL4's probe and BL5's chamber answer with
+`{agent, status, summary, outputs}`, so the strict read raised `KeyError` and a harness passing a
+phase's results wholesale lost the whole call.
+
+`load_agent_findings` is the reader for that shape — tolerant of a missing key, and attributing each
+finding to the dispatch that wrote it. Its own docstring already drew the line: agent results get
+the tolerant read, `findings.json` keeps the strict one. `merge` was on the wrong side of it.
+
+Measured on a full `balanced` audit of `leaky-node`, 13 dispatches and $1.0910: the agents found all
+six of the fixture's vulnerabilities with correct line numbers, and the 38 KB report named the three
+hardcoded secrets and none of the three logic flaws. Every finding it shipped came from a scanner.
+With the tolerant read, on the same result files: `findings.json` 11 → 35, `consolidate` 11 → 24
+finding dirs, the report 38 KB → 86.7 KB.
+
+### Tests
+
+647 (was 643), corpus gate green. `test_mode_smoke` advanced the whole balanced chain by writing
+gate artifacts alone, never banking a hunter's result — that test was encoding the first bug, and it
+now banks BL3's roster.
+
 ## [0.2.2] - 2026-08-24
 
 A patch, not a contract change: an audit written by 0.2.0 or 0.2.1 still resumes here. Everything

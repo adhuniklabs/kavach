@@ -4,7 +4,7 @@
 
   "id": "security",
   "name": "KAVACH Security Audit",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Zero-input adversarial security audit — VAPT-grade, fail-closed.",
   "author": { "name": "Adhunik Labs", "url": "https://github.com/adhuniklabs" },
   "license": "MIT",
