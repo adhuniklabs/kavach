@@ -18,13 +18,20 @@ from kavach.finding import (Confidence, Finding, Location, Severity, dump_findin
                             load_findings)
 
 
-def _reasoned(title="IDOR on /orders", severity=Severity.HIGH):
+def _reasoned(title="IDOR on /orders", severity=Severity.HIGH, cvss=8.1):
     return Finding(
         title=title, severity=severity, category="API1:BOLA", source="kavach-api",
         locations=[Location(file=f"api/{title.split()[0].lower()}.py", line=42)],
         what_it_is="x" * 200, how_exploited="y" * 200, business_impact="z" * 200,
-        remediation="w" * 200, confidence=Confidence.CONFIRMED, cvss_score=8.1,
+        remediation="w" * 200, confidence=Confidence.CONFIRMED, cvss_score=cvss,
     )
+
+
+def _iac_row(title="Container runs as root"):
+    return Finding(title=title, severity=Severity.HIGH, category="A05:Misconfiguration",
+                   source="checkov", rule_id="CKV_DOCKER_3",
+                   locations=[Location(file="Dockerfile", line=1)],
+                   remediation="Declare a non-root USER.", confidence=Confidence.CONFIRMED)
 
 
 def _scanner_row(title="requests 2.28.1: CVE-2024-35195"):
@@ -206,6 +213,109 @@ class TestCoverageIsScoped(unittest.TestCase):
             self.assertEqual(set(entry),
                              {"display_id", "dir", "kavach_id", "reason", "detail"})
             self.assertIn(entry["reason"], findings_tree.STALE_REASONS)
+
+
+class TestStableDisplayIds(unittest.TestCase):
+    """Numbering from scratch grew the tree on its own.
+
+    A second pass over a larger finding set slid every id down a place and wrote a fresh
+    directory beside each old one - measured at 35 directories for 24 promoted findings, with
+    the report rendered over the duplicates. These pin that a live finding keeps the id, and
+    the directory, the first pass gave it.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+
+    def _consolidate(self, findings):
+        dump_findings(findings, os.path.join(self.dir, "findings.json"))
+        return findings_tree.consolidate(self.dir, findings)
+
+    def _ids(self):
+        """kavach_id -> display id, over every directory on disk."""
+        out = {}
+        for fdir in findings_tree.promoted_dirs(self.dir):
+            meta = findings_tree.read_metadata(fdir)
+            out[meta["kavach_id"]] = meta["display_id"]
+        return out
+
+    def test_a_later_pass_does_not_renumber_what_the_first_one_promoted(self):
+        first, second = _reasoned("IDOR on orders"), _reasoned("Mass assignment on users")
+        self._consolidate([first, second])
+        outranks = _reasoned("Auth bypass on admin", cvss=9.6)
+        self._consolidate([outranks, first, second])
+
+        self.assertEqual(len(findings_tree.promoted_dirs(self.dir)), 3)
+        ids = self._ids()
+        self.assertEqual(ids[first.fingerprint()], "H1")
+        self.assertEqual(ids[second.fingerprint()], "H2")
+        self.assertEqual(ids[outranks.fingerprint()], "H3")
+        self.assertEqual(findings_tree.scope_promoted(self.dir)[1], [])
+
+    def test_evidence_written_between_two_passes_stays_with_its_finding(self):
+        """Why --prune-stale was held back: a renumber between a PoC landing and the next
+        promote left that PoC in the directory the prune would carry away."""
+        finding = _reasoned("IDOR on orders")
+        [fdir] = self._consolidate([finding])
+        with open(os.path.join(fdir, "poc.md"), "w", encoding="utf-8") as fh:
+            fh.write("# Repro\n\ncurl -s http://localhost/orders/2\n")
+        self._consolidate([_reasoned("Auth bypass on admin", cvss=9.6), finding])
+
+        self.assertEqual(findings_tree.prune_stale(self.dir), [])
+        self.assertTrue(os.path.exists(os.path.join(fdir, "poc.md")))
+
+    def test_a_number_a_dropped_finding_left_is_not_handed_to_a_new_one(self):
+        """A recycled number puts two directories on the same display id, and the report has
+        no way to tell them apart. New ids are issued above every id on disk instead."""
+        kept = _reasoned("Mass assignment on users")
+        self._consolidate([_reasoned("IDOR on orders"), kept])
+        self._consolidate([kept, _reasoned("SSRF on webhooks")])
+
+        display_ids = [findings_tree.read_metadata(d)["display_id"]
+                       for d in findings_tree.promoted_dirs(self.dir)]
+        self.assertEqual(sorted(display_ids), ["H1", "H2", "H3"])
+
+    def test_a_severity_that_crosses_bands_takes_its_directory_with_it(self):
+        """dedupe raises severity when a second scanner corroborates a finding, and the
+        fingerprint does not move with it. The evidence belongs to the finding, not the id."""
+        [fdir] = self._consolidate([_reasoned("IDOR on orders")])
+        with open(os.path.join(fdir, "poc.md"), "w", encoding="utf-8") as fh:
+            fh.write("# Repro\n")
+        [promoted] = self._consolidate([_reasoned("IDOR on orders",
+                                                  severity=Severity.CRITICAL)])
+
+        self.assertEqual(os.path.basename(promoted), "C1-idor-on-orders")
+        self.assertTrue(os.path.exists(os.path.join(promoted, "poc.md")))
+        self.assertEqual(findings_tree.promoted_dirs(self.dir), [promoted])
+
+    def test_a_tree_an_older_engine_doubled_is_adopted_by_its_evidence(self):
+        """0.2.4 and earlier left two directories for one fingerprint. Re-consolidating such
+        a tree has to keep the one that was paid for, not the one that sorts first."""
+        finding = _reasoned("IDOR on orders")
+        [empty] = self._consolidate([finding])
+        doubled = os.path.join(self.dir, "findings", "H2-idor-on-orders")
+        shutil.copytree(empty, doubled)
+        meta = findings_tree.read_metadata(doubled)
+        meta["display_id"] = "H2"
+        with open(os.path.join(doubled, "metadata.json"), "w", encoding="utf-8") as fh:
+            json.dump(meta, fh)
+        with open(os.path.join(doubled, "poc.md"), "w", encoding="utf-8") as fh:
+            fh.write("# Repro\n")
+
+        self.assertEqual(self._consolidate([finding]), [doubled])
+        self.assertEqual(findings_tree.prune_stale(self.dir),
+                         [os.path.join(self.dir, "findings-stale", "H1-idor-on-orders")])
+        self.assertTrue(os.path.exists(os.path.join(doubled, "poc.md")))
+
+    def test_an_aggregate_keeps_the_band_letter_it_was_promoted_under(self):
+        iac = _iac_row()
+        self._consolidate([iac])
+        self._consolidate([_scanner_row(), iac])
+
+        self.assertEqual(len(findings_tree.promoted_dirs(self.dir)), 2)
+        ids = self._ids()
+        self.assertEqual(ids["KAVACH-AGG-iac"], "G1")
+        self.assertEqual(ids["KAVACH-AGG-dependency"], "G2")
 
 
 class TestPruneStale(unittest.TestCase):

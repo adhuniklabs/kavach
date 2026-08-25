@@ -1,8 +1,9 @@
 """findings-draft → findings/<id>-<slug>/ promotion.
 
 Adapted from piolium (github.com/vigolium/piolium) - MIT License, © j3ssie.
-Display ids are severity-prefixed (C1/H1/G1) and may renumber run to run; the
-stable machine id is finding.fingerprint(), stored in metadata.json.
+Display ids are severity-prefixed (C1/H1/G1) and stable within an audit directory: a
+fingerprint keeps the id, and the directory, that the first pass gave it. The stable machine
+id is still finding.fingerprint(), stored in metadata.json.
 
 Only ``triage.PROMOTABLE_CLASSES`` at critical/high get their own directory. Scanner
 classes roll up into one ``G``-banded aggregate directory per class, whose report.md is
@@ -14,10 +15,15 @@ after a legacy ``severity >= medium`` policy - holds directories that are no lon
 the audit. It therefore records exactly which directory it wrote for which fingerprint in
 ``attack-surface/promoted-index.json``, and :func:`scope_promoted` reads that manifest back.
 One writer, one reader: the live set is inspectable rather than inferred, which matters
-because two code paths re-deriving it is how it drifted in the first place. Re-deriving it
-from the promotion policy is not sufficient on its own - display ids renumber, so the legacy
-directory and the freshly written one carry the *same* fingerprint and different names, and
-an id-keyed predicate keeps both.
+because two code paths re-deriving it is how it drifted in the first place.
+
+Numbering from scratch used to make that set grow on its own. A second pass over a larger
+finding set slid every id down a place, wrote a fresh directory beside each old one, and
+``scope_promoted`` correctly reported half the tree as stale: a balanced audit measured 35
+directories for 24 findings, and ``render`` built the deliverable over the duplicates. Ids
+are now assigned from what is already on disk, so a live finding cannot be handed a second
+directory. That is the fix rather than pruning afterwards, because pruning has to move a
+directory that may hold a proof of concept somebody paid for.
 """
 
 from __future__ import annotations
@@ -34,6 +40,11 @@ from .finding import Finding, Severity, load_findings
 
 AGGREGATE_ID_PREFIX = "KAVACH-AGG-"
 _INDEX_REL = ("attack-surface", "promoted-index.json")
+
+# What consolidate writes itself. Anything else in a promoted directory was paid for - a
+# proof of concept, a write-up, a captured request - and it decides which directory a
+# fingerprint keeps when an older engine left it more than one.
+_CORE_WRITES = {"draft.md", "metadata.json", "rows.json"}
 
 # Why a promoted directory is not part of the current audit. A stale directory is reported
 # and skipped, never deleted and never counted as missing work - demanding a PoC for a
@@ -286,6 +297,70 @@ def prune_stale(audit_dir: str, findings: list[Finding] | None = None) -> list[s
     return moved
 
 
+def _display_n(display_id: str) -> int:
+    digits = "".join(ch for ch in display_id if ch.isdigit())
+    return int(digits) if digits else 0
+
+
+def _has_evidence(finding_dir: str) -> bool:
+    """Whether the directory holds anything a run paid for. consolidate writes draft.md,
+    metadata.json, rows.json and an empty evidence/; a proof of concept, a written report or
+    a captured artifact is everything else."""
+    for name in os.listdir(finding_dir):
+        if name in _CORE_WRITES:
+            continue
+        if name == "evidence" and not os.listdir(os.path.join(finding_dir, "evidence")):
+            continue
+        return True
+    return False
+
+
+def _supersedes(candidate: tuple[str, str], held: tuple[str, str]) -> bool:
+    """Which of two directories carrying one fingerprint the next pass writes into: the one
+    holding evidence, then the lower display id. A tree an older engine already doubled is
+    adopted by its proof of concept rather than by whichever name sorts first."""
+    candidate_evidence, held_evidence = _has_evidence(candidate[1]), _has_evidence(held[1])
+    if candidate_evidence != held_evidence:
+        return candidate_evidence
+    return _display_n(candidate[0]) < _display_n(held[0])
+
+
+def _existing_placements(audit_dir: str) -> tuple[dict[str, tuple[str, str]], dict[str, int]]:
+    """(kavach_id -> the (display id, directory) it already holds, band -> highest id in use).
+
+    Read off the directories rather than out of ``promoted-index.json``: a tree written by an
+    older engine carries directories the manifest never described, and those are exactly the
+    ones whose numbers must not be issued a second time.
+    """
+    placements: dict[str, tuple[str, str]] = {}
+    highest: dict[str, int] = {}
+    for fdir in promoted_dirs(audit_dir):
+        meta = read_metadata(fdir)
+        if meta is None:
+            continue
+        display_id = str(meta.get("display_id", ""))
+        n = _display_n(display_id)
+        if not n:
+            continue
+        band = display_id[0]
+        highest[band] = max(highest.get(band, 0), n)
+        kavach_id = str(meta.get("kavach_id", ""))
+        held = placements.get(kavach_id)
+        if kavach_id and (held is None or _supersedes((display_id, fdir), held)):
+            placements[kavach_id] = (display_id, fdir)
+    return placements, highest
+
+
+def _assign(band: str, held: tuple[str, str] | None, counters: dict[str, int]) -> str:
+    """The id this finding already holds, or the next one free in its band. A new id is issued
+    above every id on disk and never into a gap a de-promoted finding left, so a fresh
+    directory cannot land on the name a stale one is still using."""
+    if held is not None and held[0][0] == band:
+        return held[0]
+    counters[band] = counters.get(band, 0) + 1
+    return f"{band}{counters[band]}"
+
+
 def consolidate(audit_dir: str, findings: list[Finding]) -> list[str]:
     # Always create findings/, even on a zero-finding run - phases whose gate is just
     # ["findings"] (RV9/RV10/RV10k, MG6, ...) would otherwise never be satisfiable.
@@ -293,13 +368,17 @@ def consolidate(audit_dir: str, findings: list[Finding]) -> list[str]:
     findings = triage.classify_all(findings)
     promoted, grouped = partition(findings)
 
-    counters: dict[str, int] = {}
+    placements, counters = _existing_placements(audit_dir)
     created = []
     for f in promoted:
         band = _BAND[f.severity]
-        counters[band] = counters.get(band, 0) + 1
-        display_id = f"{band}{counters[band]}"
+        held = placements.get(f.fingerprint())
+        display_id = _assign(band, held, counters)
         fdir = os.path.join(audit_dir, "findings", f"{display_id}-{slugify(f.title)}")
+        if held is not None and held[1] != fdir and not os.path.exists(fdir):
+            # A severity that crossed bands takes its directory with it rather than orphaning
+            # it: the evidence belongs to the finding, not to the id it used to carry.
+            os.replace(held[1], fdir)
         os.makedirs(os.path.join(fdir, "evidence"), exist_ok=True)
         with open(os.path.join(fdir, "draft.md"), "w", encoding="utf-8") as fh:
             fh.write(f"# [{display_id}] {f.title}\n\n{f.what_it_is}\n\n{f.how_exploited}\n")
@@ -318,8 +397,8 @@ def consolidate(audit_dir: str, findings: list[Finding]) -> list[str]:
         members = grouped.get(cls)
         if not members:
             continue
-        counters[_AGGREGATE_BAND] = counters.get(_AGGREGATE_BAND, 0) + 1
-        display_id = f"{_AGGREGATE_BAND}{counters[_AGGREGATE_BAND]}"
+        display_id = _assign(_AGGREGATE_BAND,
+                             placements.get(f"{AGGREGATE_ID_PREFIX}{cls}"), counters)
         created.append(write_aggregate(audit_dir, display_id, cls, members))
 
     write_promoted_index(audit_dir, created)

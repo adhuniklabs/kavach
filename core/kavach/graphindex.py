@@ -28,6 +28,11 @@ BINARY = "codegraph"
 STATUS_ARTIFACT = os.path.join("attack-surface", "graph-status.json")
 DEFAULT_TIMEOUT = 20 * 60      # the Linux kernel indexes in under 12 minutes on 2 cores
 
+# codegraph reports usage home unless told not to. An audit is pointed at a tree the operator
+# did not choose to publish, and its symbol graph is not ours to send anywhere, so every spawn
+# opts out - `status` and `version` included, since those reach the same binary.
+SPAWN_ENV = {"CODEGRAPH_TELEMETRY": "0"}
+
 
 def binary_path(binary: str = BINARY) -> str | None:
     return shutil.which(binary)
@@ -35,7 +40,8 @@ def binary_path(binary: str = BINARY) -> str | None:
 
 def _run(argv: list[str], *, timeout: int, cwd: str | None = None) -> tuple[int, str, str]:
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd,
+                              env={**os.environ, **SPAWN_ENV})
     except subprocess.TimeoutExpired:
         return 124, "", f"timed out after {timeout}s"
     except OSError as exc:

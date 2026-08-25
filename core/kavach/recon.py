@@ -19,6 +19,19 @@ IGNORE_DIRS = {
     "bower_components", ".cache", "site-packages",
 }
 
+# Dot-directories are tool state by convention - an index, a cache, a virtualenv - and a walk
+# that follows them puts generated binary into a manifest whose job is to prove source
+# coverage (one `.codegraph/codegraph.db` measured 23 MB). They are skipped as a class rather
+# than enumerated, because the next tool to invent one ships before we hear about it. These
+# are the exceptions: configuration that ships with the repository and runs somewhere, which
+# is exactly the surface an audit is there to read. Dot-*files* are untouched - `.env` is what
+# a secret scanner exists for.
+AUDITED_DOT_DIRS = {
+    ".github", ".gitlab", ".circleci", ".buildkite", ".azure-pipelines", ".husky",
+    ".devcontainer", ".docker", ".ebextensions", ".platform", ".well-known", ".config",
+    ".aws", ".ssh", ".gnupg",
+}
+
 LANG_BY_EXT = {
     ".py": "Python", ".js": "JavaScript", ".jsx": "JavaScript", ".mjs": "JavaScript",
     ".cjs": "JavaScript", ".ts": "TypeScript", ".tsx": "TypeScript", ".go": "Go",
@@ -90,6 +103,10 @@ MARKERS: dict[str, dict[str, list[str]]] = {
 }
 
 
+def _walkable(name: str) -> bool:
+    return name in AUDITED_DOT_DIRS if name.startswith(".") else name not in IGNORE_DIRS
+
+
 def _is_manifest(name: str) -> str | None:
     low = name.lower()
     if low in MANIFEST_TYPES:
@@ -154,7 +171,7 @@ def run_recon(root: str, *, max_code_scan: int = 400, max_read_bytes: int = 4000
     code_scanned = 0
 
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in IGNORE_DIRS and not d.startswith(".terraform")]
+        dirnames[:] = [d for d in dirnames if _walkable(d)]
         for name in filenames:
             abspath = os.path.join(dirpath, name)
             rel = os.path.relpath(abspath, root)

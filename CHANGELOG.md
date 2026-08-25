@@ -3,6 +3,77 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.5] - 2026-08-25
+
+A patch, and it holds: an audit written by any 0.2.x still resumes here. No phase id, no prereq
+edge, no gate artifact and no CLI output shape moves. What changes is which directory
+`consolidate` writes into, which directories `recon` walks, and what `graph index` tells the tool
+it spawns. All three were found by driving the engine from a real harness against real trees.
+
+### `consolidate` numbered from scratch, so the tree grew on its own
+
+Display ids were assigned in severity order on every pass. A second pass over a larger finding set
+therefore slid every id down a place and wrote a *fresh* directory beside each old one, for
+findings that had not changed at all. `scope_promoted` correctly reported half the tree as stale,
+and `render` built the deliverable over the duplicates.
+
+Measured on a balanced audit driven from a real harness: **35 finding directories for 24 promoted
+findings**, with `C1`-`C8` and `H1`-`H3` each doubled.
+
+`consolidate --prune-stale` has shipped since 0.2.0 and moves superseded directories to
+`findings-stale/`, and it is the wrong fix for this. A renumber that lands between a proof of
+concept being written and the next promote leaves that PoC in the directory the prune carries away,
+and losing evidence a run paid for is worse than a duplicated directory. So the numbering is stable
+instead - a bug that cannot be created beats one that has to be cleaned up.
+
+- **Ids are assigned from what is on disk**, not from the sort order. A fingerprint keeps the id,
+  and the directory, that first promoted it, so a re-consolidate writes over its own work.
+- **A new id is issued above every id on disk**, never into a gap a de-promoted finding left.
+  Recycling a number puts two directories on one display id, which the report has no way to tell
+  apart; gaps are the cheaper artifact.
+- **A severity that crosses bands renames its directory** rather than orphaning it. `sweep.dedupe`
+  raises severity when a second scanner corroborates a finding and the fingerprint does not move
+  with it, and the evidence belongs to the finding, not to the id it used to carry.
+- **A tree an earlier engine already doubled is adopted by its evidence.** Where two directories
+  carry one fingerprint, the pass writes into the one holding a PoC, a write-up or a captured
+  artifact, so re-consolidating such a tree collapses onto the paid-for copy and leaves the empty
+  twin for `--prune-stale`.
+
+`render` read the raw directory listing, so it rendered the twins - and `FP-` renames with them. It
+now reads through `findings_tree.scope_promoted`, the reader `coverage` already used, so the gate
+and the deliverable describe one set. The Limits section already named the stale count; the annex
+now agrees with it.
+
+### `recon` walked dot-directories, so tool state landed in the coverage appendix
+
+`file-manifest.txt` is the report's Appendix B - coverage proven by a script rather than claimed by
+a model. The walk skipped build and cache directories by name and followed everything else, so it
+pulled a 23 MB `.codegraph/codegraph.db` into that manifest, and `scope` then ranked it.
+
+Dot-directories are now skipped as a class rather than enumerated, because the next tool to invent
+one ships before we hear about it. This is deliberately **not** a blanket "skip anything starting
+with a dot". `AUDITED_DOT_DIRS` names the exceptions - configuration that ships with the repository
+and runs somewhere, which is exactly the surface an audit exists to read: `.github`, `.gitlab`,
+`.circleci`, `.buildkite`, `.azure-pipelines`, `.husky`, `.devcontainer`, `.docker`,
+`.ebextensions`, `.platform`, `.well-known`, `.config`, `.aws`, `.ssh`, `.gnupg`. The CI detector
+already depended on walking `.github/workflows`, and a credential directory committed to a
+repository is the highest-value thing a secret scanner can be pointed at.
+
+Dot-*files* are untouched: the filter only ever sees directory names, and `.env` is what a secret
+scanner is for.
+
+### `graph index` let codegraph phone home about a private repository
+
+codegraph telemetry is on by default and nothing in `graphindex` said otherwise, so an audit of a
+closed tree reported its own symbol graph upstream. Every spawn now carries
+`CODEGRAPH_TELEMETRY=0` - `status` and `version` included, since those reach the same binary.
+
+### Tests
+
+659 (was 647), corpus gate green. Ten of the twelve new tests fail against 0.2.4. The other two
+guard the dot-directory decision from the other side: `.github/workflows` still reaching the
+manifest fails against a blanket dot skip, and `.env` is a file the directory filter never sees.
+
 ## [0.2.4] - 2026-08-25
 
 A patch, and deliberately so: an audit written by any 0.2.x still resumes here. Nothing in the

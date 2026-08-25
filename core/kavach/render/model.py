@@ -20,11 +20,11 @@ than a report that says "not measured".
 
 from __future__ import annotations
 
-import glob
 import json
 import os
 from dataclasses import dataclass, field
 
+from .. import findings_tree
 from ..finding import Confidence, Finding, Severity
 from ..score import GATE_CONTROLS, GateResult
 from ..scoring import (Axis, Scorecard, SubScore, axis_for,  # noqa: F401 (re-exported)
@@ -328,16 +328,20 @@ def _category_token(category: str) -> str:
 
 
 def load_promoted(audit_dir: str) -> list[dict]:
-    """The promoted finding tree as the report sees it: display_id, dir, severity, aggregate."""
+    """The promoted finding tree as the report sees it: display_id, dir, severity, aggregate.
+
+    Scoped through ``findings_tree.scope_promoted``, the reader ``coverage`` already uses, so
+    the gate and the deliverable describe one set. The raw directory listing also carries
+    whatever earlier passes superseded, and a report rendered over a superseded twin is the
+    only kind of stale directory that reaches a client - ``_limits`` names the count instead.
+    """
     if not audit_dir:
         return []
     out = []
-    pattern = os.path.join(audit_dir, "findings", "*", "metadata.json")
-    for path in sorted(glob.glob(pattern)):
-        meta = _read_json(path)
-        if not isinstance(meta, dict) or not meta.get("display_id"):
+    for fdir in findings_tree.scope_promoted(audit_dir)[0]:
+        meta = findings_tree.read_metadata(fdir)
+        if not meta or not meta.get("display_id"):
             continue
-        fdir = os.path.dirname(path)
         out.append({
             "display_id": meta["display_id"],
             "dir": os.path.join("findings", os.path.basename(fdir)),

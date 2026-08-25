@@ -120,6 +120,43 @@ class TestRecon(unittest.TestCase):
         self.assertIn("AWS", recon["cloud"])
 
 
+class TestReconWalksTheRightDirectories(unittest.TestCase):
+    """The manifest is Appendix B - coverage proven by a script. Tool state is not coverage:
+    a walk that followed dot-directories put a 23 MB `.codegraph/codegraph.db` in it. What a
+    dot-directory holds is the whole question, though, so the skip is a decision per name."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def _write(self, rel, body="x"):
+        path = os.path.join(self.root, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(body)
+
+    def test_tool_state_in_a_dot_directory_stays_out_of_the_manifest(self):
+        self._write(os.path.join(".codegraph", "codegraph.db"), "\x00" * 64)
+        self._write(os.path.join(".kavach", "findings.json"), "{}")
+        self._write("app.py", "import flask\n")
+        _, files = run_recon(self.root)
+        self.assertEqual(files, ["app.py"])
+
+    def test_ci_workflows_are_walked_because_they_are_attack_surface(self):
+        self._write(os.path.join(".github", "workflows", "deploy.yml"),
+                    "on: push\njobs:\n  d:\n    runs-on: ubuntu-latest\n")
+        self._write(os.path.join(".husky", "pre-commit"), "#!/bin/sh\nnpm test\n")
+        recon, files = run_recon(self.root)
+        self.assertEqual(recon["iac"]["ci"], [os.path.join(".github", "workflows", "deploy.yml")])
+        self.assertIn(os.path.join(".husky", "pre-commit"), files)
+
+    def test_a_dotfile_is_not_a_dot_directory(self):
+        """`.env` is exactly what a secret scanner is pointed at."""
+        self._write(".env", "STRIPE_SECRET_KEY=sk_live_notreal\n")
+        recon, files = run_recon(self.root)
+        self.assertEqual(recon["secret_surfaces"], [".env"])
+        self.assertIn(".env", files)
+
+
 class TestBuiltinSecrets(unittest.TestCase):
     def test_finds_planted_secrets(self):
         recon, _ = run_recon(os.path.join(FIXTURES, "leaky-node"))

@@ -62,6 +62,20 @@ esac
 """
 
 
+# Records what the spawn was given as well as what it was called with. Telemetry is on by
+# default in the real binary, and an audit is pointed at a tree the operator did not choose
+# to publish.
+STUB_ECHOES_ENV = """#!/bin/sh
+echo "$1 telemetry=${CODEGRAPH_TELEMETRY-unset}" >> "$CG_CALLS"
+case "$1" in
+  version) echo "codegraph 9.9.9" ;;
+  index)   echo "indexed" ;;
+  status)  echo '{"initialized": true}' ;;
+  *)       exit 1 ;;
+esac
+"""
+
+
 def _stub(directory: str, script: str, name: str = "codegraph") -> str:
     path = os.path.join(directory, name)
     with open(path, "w", encoding="utf-8") as fh:
@@ -164,6 +178,17 @@ class TestGraphIndex(unittest.TestCase):
         _stub(self.bin_dir, STUB_NO_JSON_STATUS)
         self.assertTrue(graphindex.index(self.target, self.dir)["available"])
         self.assertIn("init", self._verbs())
+
+    def test_every_spawn_opts_out_of_the_tools_telemetry(self):
+        """codegraph phones home by default, and what it would report is the symbol graph of
+        a private repository. `status` and `version` are spawns too."""
+        _stub(self.bin_dir, STUB_ECHOES_ENV)
+        self.assertTrue(graphindex.index(self.target, self.dir)["available"])
+        with open(self.calls, encoding="utf-8") as fh:
+            recorded = [line.strip() for line in fh if line.strip()]
+        self.assertEqual(sorted({line.split()[0] for line in recorded}),
+                         ["index", "status", "version"])
+        self.assertEqual([line for line in recorded if not line.endswith("telemetry=0")], [])
 
     def test_status_of_an_untouched_audit_dir_is_not_available(self):
         self.assertFalse(graphindex.available(self.dir))
