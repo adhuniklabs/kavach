@@ -3,6 +3,25 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.4] - 2026-08-25
+
+A patch, and deliberately so: an audit written by any 0.2.x still resumes here. Nothing in the
+engine changes — the only edit is what the module tells a harness it offers.
+
+### `longshot` and `revisit` were drivable and not advertised
+
+`modes.MODE_PHASES` has carried all eight modes since 0.1; `karya-module.json` declared four. A
+harness that validates a requested mode against the manifest — which is the right thing for it to
+do, since the manifest is what a module publishes — refused two modes the engine plans cleanly and
+a driver walks end to end.
+
+- **`longshot`** — `LS1` `core:enumerate`, `LS2` the per-file hail-mary hunt, `LS3` aggregation.
+- **`revisit`** — `RV0` intent cartography through `RV11c`, over a finished audit.
+
+`confirm` and `merge` stay undeclared on purpose. `confirm` runs live proof-of-concept code against
+a running service, which every sandbox a harness is likely to impose refuses by design; `merge`
+needs a multi-audit driver (`merge-run`, `core:merge --extra`) that does not exist yet.
+
 ## [0.2.3] - 2026-08-25
 
 A patch, not a contract change: an audit written by 0.2.0, 0.2.1 or 0.2.2 still resumes here. Both
