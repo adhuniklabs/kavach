@@ -298,6 +298,14 @@ class TestPromotedTree(unittest.TestCase):
         with open(os.path.join(d, "metadata.json"), "w", encoding="utf-8") as fh:
             json.dump(meta, fh)
 
+    def _index(self, *dirs):
+        """consolidate's manifest, naming the directories that are live right now."""
+        path = os.path.join(self.dir, "attack-surface", "promoted-index.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"count": len(dirs),
+                       "entries": [{"dir": d} for d in dirs]}, fh)
+
     def test_promoted_rows_carry_the_aggregate_keys(self):
         rows = model.load_promoted(self.dir)
         self.assertEqual([r["display_id"] for r in rows], ["C1", "G1"])
@@ -318,6 +326,23 @@ class TestPromotedTree(unittest.TestCase):
     def test_a_directory_without_metadata_is_skipped(self):
         os.makedirs(os.path.join(self.dir, "findings", "junk"), exist_ok=True)
         self.assertEqual(len(model.load_promoted(self.dir)), 2)
+
+    def test_a_superseded_directory_does_not_reach_the_annex(self):
+        """`consolidate` leaves what it supersedes on disk and records the live set in its
+        manifest. `coverage` already scopes past the remainder; the report was the last
+        consumer reading the raw listing, and it is the copy a client reads."""
+        self._promote("C2-hardcoded-stripe-key",
+                      {"display_id": "C2", "kavach_id": "KAVACH-aaaa", "severity": "critical",
+                       "is_aggregate": False, "finding_class": "secret"})
+        self._index("findings/C2-hardcoded-stripe-key",
+                    "findings/G1-vulnerable-dependencies")
+        self.assertEqual([r["display_id"] for r in model.load_promoted(self.dir)],
+                         ["C2", "G1"])
+
+    def test_a_false_positive_rename_does_not_reach_the_annex(self):
+        os.rename(os.path.join(self.dir, "findings", "C1-hardcoded-stripe-key"),
+                  os.path.join(self.dir, "findings", "FP-C1-hardcoded-stripe-key"))
+        self.assertEqual([r["display_id"] for r in model.load_promoted(self.dir)], ["G1"])
 
 
 class TestMarkdownRender(unittest.TestCase):

@@ -218,9 +218,13 @@ the audit whenever the promoted set changes - and it changes in three ordinary w
 - **A finding moved.** It dropped critical/high → medium between runs, or was reclassified from
   `reasoned` to a scanner class. It is still in `findings.json`, it is just no longer promoted
   individually.
-- **Display ids renumbered.** `C1`/`H1`/`G1` are not stable across runs (see the display-id section
-  below), so a re-audit writes `C11-<slug>` where the previous run wrote `C10-<slug>` **for the same
-  fingerprint**. Both directories now exist and only one of them is live.
+- **Display ids renumbered.** Until 0.2.5 they did. A second pass numbered from scratch, so a
+  re-consolidate wrote `C11-<slug>` where the previous pass wrote `C10-<slug>` **for the same
+  fingerprint**, and both directories existed with only one of them live - measured at 35
+  directories for 24 promoted findings. Ids are now assigned from what is already on disk, so
+  this no longer happens going forward; a tree an earlier engine already doubled still carries
+  what it made, and re-consolidating it keeps the directory holding the evidence and leaves the
+  empty twin behind as stale.
 
 That last one is why the live set is **recorded, not re-derived**. `consolidate` writes
 `attack-surface/promoted-index.json` as it goes:
@@ -320,10 +324,14 @@ KAVACH carries **two** ids per finding, deliberately never conflated:
 - **Display id / directory name** - band-prefixed, sequential within its band: `C1`, `C2`, `H1`, …
   (`C` = critical, `H` = high) plus `G1`, `G2` for the two class aggregates (`G` = grouped, and it
   sorts after `C` and `H`). Assigned by `findings_tree.consolidate()` in severity order (critical
-  first, then by descending CVSS score within a band). This id is **not stable across runs** -
-  rerun the audit and a finding's number can shift if the finding mix changes. It exists purely to
-  be short, sortable, and readable in a report; humans reference "C1" in conversation, not the
-  fingerprint.
+  first, then by descending CVSS score within a band) the first time a fingerprint is promoted,
+  and kept from then on: a later pass over a larger finding set reuses the id and the directory
+  rather than renumbering, so evidence written between two passes stays with its finding. A
+  number a de-promoted finding freed is never issued again, so gaps are normal and two
+  directories never share an id. It is stable **within one audit directory** - two separate
+  audits of the same tree number independently, and `merge-run` renumbers across sources into a
+  merged set (`merge-rename-map.json`). It exists purely to be short, sortable, and readable in a
+  report; humans reference "C1" in conversation, not the fingerprint.
 
   An aggregate's machine id is not a fingerprint at all: it is the constructed
   `KAVACH-AGG-<class>`, which is stable by definition and cannot collide with a sha1 form.
