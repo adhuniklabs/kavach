@@ -123,16 +123,14 @@ kavach budget charge --phase BL3 -n 8 --cost-usd 0.42   # spend, if your harness
 kavach events                                    # the run log, one JSON object per line
 ```
 
-On a large repo, two more before the fan-out:
+On a large repo, one more before the fan-out:
 
 ```bash
-kavach graph index .                             # optional codegraph index; exits 0 without it
 kavach scope --agent kavach-billing --limit 200  # rank the manifest by security relevance
 ```
 
-Both are optional and both cut discovery cost - the budget a hunter otherwise spends following
-imports by hand before it reaches the line it cites. No `codegraph` binary means hunters grep
-instead and every prompt says so.
+It's optional and cuts discovery cost - the budget a hunter otherwise spends following imports by
+hand before it reaches the line it cites.
 
 `tier:` is `model:` spelled provider-neutrally, so a non-Claude harness can route each agent without
 knowing Anthropic's model names. See [`docs/orchestration.md`](./docs/orchestration.md).

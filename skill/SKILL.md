@@ -123,18 +123,6 @@ would never run. `merge` mode needs >= 2 source `findings.json` sets - confirm t
 at least two source directories before starting; if not, tell them merge mode has nothing to merge
 with one.
 
-**Index the code graph once, up front, on any mode that dispatches hunters.**
-
-```bash
-K graph index "$TARGET" --out "$AUDIT"    # exits 0 even when codegraph is not installed
-```
-
-It is optional the way a scanner is optional: no `codegraph` binary means the hunters grep
-instead, `graph-status.json` records why, and every dispatch prompt tells the agent so. When it
-*is* available the prompt tells each agent to answer structural questions from the graph before
-reaching for grep - which is where a hunter otherwise spends most of its budget, following imports
-by hand to reach the line it will finally cite.
-
 **Scope the manifest before a fan-out on anything large.**
 
 ```bash

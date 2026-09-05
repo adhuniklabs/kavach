@@ -16,7 +16,7 @@ import uuid
 import yaml
 from filelock import FileLock
 
-from . import graphindex, modes, paths, scoping
+from . import modes, paths, scoping
 from .finding import Finding
 from .findings_tree import slugify, write_draft
 
@@ -268,7 +268,7 @@ def phase_prompt(mode: str, phase: str, audit_dir: str, target: str, *,
     if missing:
         body += ["", f"  Not installed on this machine, so unavailable to you: {', '.join(missing)}"]
     body += ["", "Audit inputs:", _bullets(inputs), "", "---", "",
-             graphindex.prompt_section(audit_dir), "---", "", "## Your task", "", spec.task]
+             "## Your task", "", spec.task]
     if spec.roster and len(spec.roster) > 1:
         peers = ", ".join(a for a in spec.roster if a != executor)
         body += ["", f"You are one of {len(spec.roster)} agents on this phase "
@@ -295,7 +295,6 @@ def dispatch_plan(mode: str, phase: str, audit_dir: str, target: str) -> dict:
         "prereqs": modes.prereqs_for(mode, phase),
         "gate": [os.path.join(out, g) for g in modes.gate_for(phase)],
         "inputs": _existing_inputs(mode, phase, out),
-        "graph": graphindex.read_status(out),
         "dispatches": [
             {
                 "agent": name,

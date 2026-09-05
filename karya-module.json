@@ -35,7 +35,6 @@
     "python": ">=3.9",
     "commands": [
       { "name": "docker", "level": "degrades", "why": "11 of 14 scanners; the builtin secrets and offline SAST rules still run" },
-      { "name": "codegraph", "level": "degrades", "why": "graph-first discovery; hunters fall back to grep and cost more" },
       { "name": "git", "level": "degrades", "why": "the baseline snapshot, and diff mode" },
       { "name": "gh", "level": "optional", "why": "the opt-in issue export" }
     ],

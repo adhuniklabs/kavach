@@ -172,25 +172,10 @@ it only changes who calls the model. Everything in this document about plan/phas
 gate/resume applies identically in `--headless` mode; the difference is purely mechanical (the
 engine dispatches instead of the skill).
 
-## The graph and the scope
+## The scope
 
-Two optional inputs, both aimed at the same cost: a hunter spends most of its budget on
-*discovery* - grep for a symbol, open the file, follow the import, repeat - before it reaches the
-line it will cite.
-
-`kavach graph index <target>` shells out to [codegraph](https://github.com/colbymchenry/codegraph)
-and records the outcome in `attack-surface/graph-status.json`. The engine never queries the graph;
-it only establishes whether one exists, so `dispatch.phase_prompt` can tell an agent to reach for
-it - or tell it plainly that there is none, which matters more, because an agent that assumes a
-tool it does not have burns a turn finding out. Missing binary, failed index and timeout are the
-same outcome: `available: false` with the reason, exit 0, hunters grep instead. It is a scanner,
-not a prerequisite. Every spawn carries `CODEGRAPH_TELEMETRY=0`: the tool reports usage home by
-default, and what it would report is the symbol graph of a tree the operator did not choose to
-publish.
-
-The graph only pays off when *every* hunter queries it. A fan-out where the lead has the graph and
-the eight sub-agents still read files pays for the index and keeps the crawl, so the graph-first
-instruction goes into every dispatch prompt, not into a coordinator's preamble.
+A hunter spends most of its budget on *discovery* - grep for a symbol, open the file, follow the
+import, repeat - before it reaches the line it will cite.
 
 `kavach scope [--agent A]` ranks `file-manifest.txt` by security relevance and writes
 `attack-surface/scope[-<agent>].json`, which `phase_prompt` names as an input (the agent's own
@@ -224,5 +209,5 @@ and not a JSON array. `kavach events [--since N]` replays it.
   `core/kavach/dispatch.py` (prompt composition, dispatch plan, ingest), `core/kavach/agentdefs.py`
   (the roster as data), `core/kavach/slicing.py` (per-agent lead lists), `core/kavach/events.py`
   (the run log), `core/kavach/budget.py` (dispatch / wall-clock / spend ceilings),
-  `core/kavach/graphindex.py` (the optional code graph), `core/kavach/scoping.py` (security-relevance
-  ranking), `core/kavach/scheduler.py` (fan-out batch planning), `core/kavach/retry.py` (backoff math).
+  `core/kavach/scoping.py` (security-relevance ranking), `core/kavach/scheduler.py` (fan-out batch
+  planning), `core/kavach/retry.py` (backoff math).
