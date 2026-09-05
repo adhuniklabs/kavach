@@ -506,7 +506,8 @@ def cmd_plan(args) -> int:
         "mode": args.mode,
         "audit_dir": out,
         "target": os.path.abspath(args.target),
-        "actionable": [dispatch.dispatch_plan(args.mode, p, out, args.target) for p in phases],
+        "actionable": [dispatch.dispatch_plan(args.mode, p, out, args.target, args.live)
+                       for p in phases],
     }, indent=2))
     return 0
 
@@ -516,7 +517,7 @@ def cmd_phase_prompt(args) -> int:
     _check_mode(args.mode)
     out = _out_dir(args)
     print(dispatch.phase_prompt(args.mode, args.phase, out, args.target,
-                                agent=args.agent, index=args.index))
+                                agent=args.agent, index=args.index, live=args.live))
     return 0
 
 

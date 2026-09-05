@@ -69,7 +69,10 @@ def _induced(phase: str, members: frozenset[str]) -> list[str]:
     out: list[str] = []
 
     def walk(p: str) -> None:
-        for q in PREREQ_EDGES[p]:
+        # `.get`, not `[]`: a phase id the registry does not know has no prerequisites,
+        # the same way it has no gate, no roster and a generic spec. A stale id out of the
+        # docs gets a generic prompt instead of a traceback out of the CLI.
+        for q in PREREQ_EDGES.get(p, ()):
             if q in members:
                 if q not in out:
                     out.append(q)
@@ -299,9 +302,8 @@ PHASE_SPECS: dict[str, PhaseSpec] = {
         "implements and what it actually does: parsing, normalization, canonicalization, "
         "state-machine compliance, middleware semantics."),
     "probe": PhaseSpec(
-        "Run the deep-probe team over each component: map the attack surface, dispatch both "
-        "reasoners in parallel for independent hypothesis rounds, cross-pollinate, then "
-        "harvest causal-challenged evidence before any verdict.",
+        "Probe the attack surface the domain pass just built, by hand. Scanners are done; "
+        "what is left is the reasoning they cannot do.",
         references=("probe-protocol.md",)),
     "crossservice": PhaseSpec(
         "Stitch inter-component data flows into one edge graph and propagate taint across "

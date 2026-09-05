@@ -87,6 +87,16 @@ class TestModes(unittest.TestCase):
         with self.assertRaises(KeyError):
             modes.phases_for("nope")
 
+    def test_an_unknown_phase_is_answered_not_raised(self):
+        """An unknown *mode* is a caller error; an unknown *phase* is not. gate_for,
+        roster_for and spec_for each answer with a safe default so a caller never has to
+        branch on presence, and prereqs_for is the fourth of that family - a retired id
+        still quoted in the docs has to yield a generic prompt, not a CLI traceback."""
+        self.assertEqual(modes.prereqs_for("balanced", "BL3"), [])
+        self.assertEqual(modes.gate_for("BL3"), [])
+        self.assertEqual(modes.roster_for("BL3", "balanced"), [])
+        self.assertTrue(modes.spec_for("BL3").task)
+
     def test_removed_modes_are_gone(self):
         for name in ("diff", "confirm", "revisit", "merge", "longshot"):
             with self.assertRaises(KeyError, msg=name):

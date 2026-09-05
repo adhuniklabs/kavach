@@ -68,6 +68,16 @@ class TestPhaseSpecs(unittest.TestCase):
         self.assertIn("attack-surface/source-sink-flows-all-severities.md", got)  # hunt's
         self.assertNotIn("findings", got)   # a directory gate is not a readable input
 
+    def test_live_inputs_come_from_the_tail_not_through_it(self):
+        """With the tail dropped, exploit's prereq resolution walks provision ->
+        envscan -> inventory -> render and hands kavach-poc-executor the final report.
+        Under --live the tail is a member, so it gets the sandbox connection that
+        provision wrote for it."""
+        self.assertIn("reports/final-audit-report.md", modes.inputs_for("deep", "exploit"))
+        got = modes.inputs_for("deep", "exploit", live=True)
+        self.assertEqual(got[-1], "attack-surface/confirm-env-connection.json")
+        self.assertNotIn("reports/final-audit-report.md", got)
+
 
 class TestPhasePrompt(unittest.TestCase):
     def setUp(self):
@@ -98,6 +108,17 @@ class TestPhasePrompt(unittest.TestCase):
             del os.environ["KAVACH_REFERENCES_DIR"]
         self.assertIn("Not installed on this machine", p)
         self.assertIn("persona.md", p)
+
+    def test_live_reaches_the_inputs_the_prompt_names(self):
+        """The flag has to survive phase_prompt -> _existing_inputs -> inputs_for, or
+        the tail agent is told to read the report instead of its own prereq."""
+        os.makedirs(os.path.join(self.dir, "attack-surface"))
+        with open(os.path.join(self.dir, "attack-surface", "confirm-env-connection.json"),
+                  "w", encoding="utf-8") as fh:
+            fh.write("{}")
+        p = dispatch.phase_prompt("deep", "exploit", self.dir, "/repo", live=True)
+        inputs = p.split("Audit inputs:")[1].split("---")[0]
+        self.assertIn("confirm-env-connection.json", inputs)
 
     def test_only_inputs_that_exist_are_named(self):
         p = dispatch.phase_prompt("balanced", "kb", self.dir, "/repo")
@@ -135,6 +156,13 @@ class TestDispatchPlan(unittest.TestCase):
     def test_sequential_rosters_are_flagged(self):
         self.assertTrue(dispatch.dispatch_plan("deep", "history", self.dir, "/repo")["sequential"])
         self.assertFalse(dispatch.dispatch_plan("deep", "hunt", self.dir, "/repo")["sequential"])
+
+    def test_live_reaches_the_dispatch_plan(self):
+        self.assertEqual(dispatch.dispatch_plan("deep", "exploit", self.dir, "/repo")["prereqs"],
+                         ["render"])
+        self.assertEqual(
+            dispatch.dispatch_plan("deep", "exploit", self.dir, "/repo", live=True)["prereqs"],
+            ["provision"])
 
     def test_gate_paths_are_absolute(self):
         plan = dispatch.dispatch_plan("balanced", "kb", self.dir, "/repo")

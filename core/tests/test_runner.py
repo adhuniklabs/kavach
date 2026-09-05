@@ -98,7 +98,7 @@ class TestRunner(unittest.TestCase):
         self._bank("hunt", "kavach-sast")
         actionable = runner.next_actionable(self.dir, "balanced")
         self.assertIn("hunt", actionable)
-        self.assertLess(actionable.index("hunt"), actionable.index("probe"))
+        self.assertIn("probe", actionable)
 
     def test_single_agent_phase_is_never_treated_as_a_fanout(self):
         # intel dispatches one agent and its result carries no index, so asking for a

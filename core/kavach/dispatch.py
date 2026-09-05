@@ -219,9 +219,10 @@ def _resolved_references(phase: str, agent: str | None) -> tuple[list[str], list
     return found, missing
 
 
-def _existing_inputs(mode: str, phase: str, audit_dir: str, agent: str | None = None) -> list[str]:
+def _existing_inputs(mode: str, phase: str, audit_dir: str, agent: str | None = None,
+                     live: bool = False) -> list[str]:
     out = []
-    for rel in modes.inputs_for(mode, phase):
+    for rel in modes.inputs_for(mode, phase, live):
         path = os.path.join(os.path.abspath(audit_dir), rel)
         if os.path.exists(path):
             out.append(path)
@@ -254,7 +255,8 @@ def _slice_path(audit_dir: str, phase: str, agent: str | None, index: int | None
 
 
 def phase_prompt(mode: str, phase: str, audit_dir: str, target: str, *,
-                 agent: str | None = None, index: int | None = None) -> str:
+                 agent: str | None = None, index: int | None = None,
+                 live: bool = False) -> str:
     """The whole dispatch, ready to send: runtime header, the files this agent must read,
     and the phase's task. This is what SKILL.md used to assemble by hand from its own prose,
     which is why every non-SKILL.md harness had to re-encode that prose to dispatch at all.
@@ -262,7 +264,7 @@ def phase_prompt(mode: str, phase: str, audit_dir: str, target: str, *,
     spec = modes.spec_for(phase)
     executor = agent or modes.PHASE_AGENT.get(phase, "")
     found, missing = _resolved_references(phase, executor)
-    inputs = _existing_inputs(mode, phase, audit_dir, executor)
+    inputs = _existing_inputs(mode, phase, audit_dir, executor, live)
 
     body = ["## Read these first", "", "References:", _bullets(found)]
     if missing:
@@ -279,7 +281,8 @@ def phase_prompt(mode: str, phase: str, audit_dir: str, target: str, *,
                           modes.gate_for(phase), agent=agent, index=index)
 
 
-def dispatch_plan(mode: str, phase: str, audit_dir: str, target: str) -> dict:
+def dispatch_plan(mode: str, phase: str, audit_dir: str, target: str,
+                  live: bool = False) -> dict:
     """Everything a harness needs to run one phase without consulting the registry itself:
     who to dispatch, how many, what each one writes, and what closes the gate."""
     executor = modes.PHASE_AGENT.get(phase, "")
@@ -293,15 +296,15 @@ def dispatch_plan(mode: str, phase: str, audit_dir: str, target: str) -> dict:
         "kind": "core" if executor.startswith("core:") else ("fanout" if len(roster) > 1 else "agent"),
         "sequential": modes.spec_for(phase).sequential,
         "planned": len(roster),
-        "prereqs": modes.prereqs_for(mode, phase),
+        "prereqs": modes.prereqs_for(mode, phase, live),
         "gate": [os.path.join(out, g) for g in modes.gate_for(phase)],
-        "inputs": _existing_inputs(mode, phase, out),
+        "inputs": _existing_inputs(mode, phase, out, live=live),
         "dispatches": [
             {
                 "agent": name,
                 "index": i,
                 "references": modes.references_for(phase, name),
-                "inputs": _existing_inputs(mode, phase, out, name),
+                "inputs": _existing_inputs(mode, phase, out, name, live),
                 "result_path": result_path(out, phase, name, index=i if len(roster) > 1 else None),
             }
             for i, name in enumerate(roster, start=1)
