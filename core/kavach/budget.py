@@ -39,9 +39,11 @@ def default_ceiling(mode: str, live: bool = False) -> int:
     `longshot`, `merge` or `diff`. Indexing on that raised KeyError through a `main()` that
     handles no such thing, so the CLI answered its own accounting verbs with a traceback.
 
-    `cmd_resume` refuses a pre-0.3 dir outright and is right to: it re-derives what is left
-    to run from a phase contract that has since changed, and a wrong answer there reports an
-    unfinished audit as a finished one. A ceiling makes no such claim - the dispatch, token
+    `cmd_resume` refuses a pre-0.3 dir that recorded a version, and is right to: it re-derives
+    what is left to run from a phase contract that has since changed, and a wrong answer there
+    reports an unfinished audit as a finished one. A version-less 0.1.0-era dir gets through
+    `version_compatible`'s escape hatch regardless, which is exactly what lands here. A ceiling
+    makes no such claim - the dispatch, token
     and cost counts stay exact whatever it is, and the only cost of picking the smallest one
     is shedding fan-out, which is recorded at decision time and reaches the reader in the
     report's Limits section. Not accounting at all is the worse failure.
