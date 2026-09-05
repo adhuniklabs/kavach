@@ -31,8 +31,8 @@ class TestFindingsTree(unittest.TestCase):
         self.assertEqual(ft.slugify("SQL Injection in Login!"), "sql-injection-in-login")
 
     def test_write_draft_has_frontmatter(self):
-        path = ft.write_draft(self.dir, _f("SQLi", Severity.CRITICAL), "BL3", 1)
-        self.assertTrue(path.endswith("bl3-001-sqli.md"))
+        path = ft.write_draft(self.dir, _f("SQLi", Severity.CRITICAL), "hunt", 1)
+        self.assertTrue(path.endswith("hunt-001-sqli.md"))
         with open(path, encoding="utf-8") as fh:
             body = fh.read()
         self.assertTrue(body.startswith("---\n"))

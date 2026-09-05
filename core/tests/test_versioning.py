@@ -45,19 +45,19 @@ class TestAuditIdentity(unittest.TestCase):
         self.assertEqual(state.handle("2026-08-23T09:14:27Z-11497-9dfadd32"), "9dfadd32")
 
     def test_an_audit_records_the_engine_that_made_it(self):
-        run = state.init_audit(self.dir, "balanced", ["BL1"])
+        run = state.init_audit(self.dir, "balanced", ["intel"])
         self.assertEqual(run.engine_version, __version__)
         self.assertEqual(state.load_state(self.dir).audits[0].engine_version, __version__)
 
     def test_find_audit_resolves_a_full_id_or_a_handle(self):
-        run = state.init_audit(self.dir, "balanced", ["BL1"])
+        run = state.init_audit(self.dir, "balanced", ["intel"])
         self.assertEqual(state.find_audit(self.dir, run.audit_id).audit_id, run.audit_id)
         self.assertEqual(state.find_audit(self.dir, state.handle(run.audit_id)).audit_id,
                          run.audit_id)
         self.assertIsNone(state.find_audit(self.dir, "deadbeef"))
 
     def test_an_ambiguous_handle_resolves_to_nothing_rather_than_a_guess(self):
-        a = state.init_audit(self.dir, "balanced", ["BL1"])
+        a = state.init_audit(self.dir, "balanced", ["intel"])
         clash = state.handle(a.audit_id)
 
         def _dup(f):
@@ -120,7 +120,7 @@ class TestGitContext(unittest.TestCase):
         self._commit()
         ctx = gitinfo.context(self.repo)
         out = tempfile.mkdtemp()
-        run = state.init_audit(out, "balanced", ["BL1"], commit=ctx.commit,
+        run = state.init_audit(out, "balanced", ["intel"], commit=ctx.commit,
                                branch=ctx.branch, dirty=ctx.dirty)
         self.assertEqual(run.commit, ctx.commit)
         self.assertFalse(run.dirty)

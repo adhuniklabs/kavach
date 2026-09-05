@@ -1,86 +1,116 @@
 """KAVACH mode/phase registry - the on-disk phase contract.
 
 Adapted from piolium (github.com/vigolium/piolium) - MIT License, © j3ssie.
-Phase ids are KAVACH-specific (LT/BL/DP/CF). Keep in sync with
-docs/phase-reference.md; nothing else in the tree may redeclare a phase id.
+Phase ids are semantic and global: a mode names a subset of PIPELINE, never its own
+ids. Keep in sync with docs/phase-reference.md; nothing else in the tree may
+redeclare a phase id.
 """
 
 from __future__ import annotations
 
-import os
+# The pipeline. One ordered list, one id namespace. A mode is a subset of it, never a
+# parallel copy - which is what eight hand-maintained lists had drifted into.
+PIPELINE: tuple[str, ...] = (
+    "recon", "sweep", "intent", "intel", "kb", "history", "hunt", "authz", "state",
+    "spec", "probe", "crossservice", "chamber", "verify", "variant", "crosscheck",
+    "poc", "report", "render",
+    "inventory", "envscan", "provision", "exploit", "testgen", "certify",
+    "cleanup",
+)
 
-MODE_PHASES: dict[str, list[str]] = {
-    "lite": ["LT0", "LT1", "LT2", "LT3", "LT4"],
-    "balanced": ["BL1", "BL2", "BL3", "BL4", "BL5", "BL6", "BL6b", "BL6c", "BL7"],
-    "deep": [f"DP{i}" for i in range(1, 18)],
+# Selected only by --live. `cleanup` sits after them in PIPELINE so the tail runs first.
+LIVE_PHASES: frozenset[str] = frozenset({
+    "inventory", "envscan", "provision", "exploit", "testgen", "certify"})
+
+_AUDIT: frozenset[str] = frozenset(p for p in PIPELINE if p not in LIVE_PHASES)
+
+PRESETS: dict[str, frozenset[str]] = {
+    "lite": frozenset({"recon", "sweep", "hunt", "poc", "render", "cleanup"}),
+    "balanced": frozenset({"recon", "sweep", "intent", "intel", "kb", "hunt", "probe",
+                           "chamber", "crosscheck", "poc", "report", "render", "cleanup"}),
+    "deep": _AUDIT,
 }
 
-MODES: list[str] = list(MODE_PHASES.keys())
+MODES: list[str] = list(PRESETS)
 
-# mode -> phase -> prerequisite phases (empty = eligible once the run starts).
-# Deep's DAG is ported verbatim from piolium; other modes are linear (each phase
-# depends on its predecessor) unless noted.
-_DEEP_PREREQS: dict[str, list[str]] = {
-    "DP1": [], "DP2": [], "DP3": [],
-    "DP4": ["DP3"],
-    "DP5": ["DP3"], "DP6": ["DP3"], "DP7": ["DP3"],
-    "DP8": ["DP3", "DP4"],
-    "DP9": ["DP4", "DP8"],
-    "DP10": ["DP5", "DP6", "DP7", "DP8", "DP9"],
-    "DP11": ["DP10"], "DP12": ["DP11"], "DP13": ["DP12"],
-    "DP14": ["DP13"], "DP15": ["DP14"], "DP16": ["DP15"], "DP17": ["DP16"],
+# `hunt` is the only phase whose roster varies by intensity: lite runs the one agent that
+# owns the gate artifact, the other two run all eight domains.
+PRESET_ROSTERS: dict[str, dict[str, tuple[str, ...]]] = {
+    "lite": {"hunt": ("kavach-sast",)},
+}
+
+# Declared once, against the whole pipeline. A preset takes the induced subgraph.
+PREREQ_EDGES: dict[str, tuple[str, ...]] = {
+    "recon": (), "sweep": ("recon",), "intent": ("recon",), "intel": ("recon",),
+    "kb": ("recon",), "history": ("recon",),
+    "hunt": ("sweep", "kb"),
+    "authz": ("kb",), "state": ("kb",), "spec": ("kb",),
+    "probe": ("kb", "hunt"), "crossservice": ("hunt",),
+    "chamber": ("hunt", "probe", "authz", "state", "spec", "crossservice",
+                "intel", "history"),
+    "verify": ("chamber",), "variant": ("verify",),
+    "crosscheck": ("intent", "variant"),
+    "poc": ("crosscheck",), "report": ("poc",), "render": ("report",),
+    "inventory": ("render",), "envscan": ("inventory",), "provision": ("envscan",),
+    "exploit": ("provision",), "testgen": ("exploit",),
+    "certify": ("exploit", "testgen"),
+    "cleanup": ("render", "certify"),
 }
 
 
-def _linear_prereqs(phases: list[str]) -> dict[str, list[str]]:
-    return {p: ([phases[i - 1]] if i else []) for i, p in enumerate(phases)}
+def _members(mode: str, live: bool) -> frozenset[str]:
+    return PRESETS[mode] | (LIVE_PHASES if live else frozenset())
 
 
-PREREQS: dict[str, dict[str, list[str]]] = {
-    m: (_DEEP_PREREQS if m == "deep" else _linear_prereqs(MODE_PHASES[m])) for m in MODES
-}
+def _induced(phase: str, members: frozenset[str]) -> list[str]:
+    """Prereqs restricted to `members`. An edge into a phase the preset drops is replaced
+    by edges to that phase's own prerequisites, transitively - so dropping `history` moves
+    chamber's dependency onto `recon` rather than leaving it unsatisfiable."""
+    out: list[str] = []
+
+    def walk(p: str) -> None:
+        for q in PREREQ_EDGES[p]:
+            if q in members:
+                if q not in out:
+                    out.append(q)
+            else:
+                walk(q)
+
+    walk(phase)
+    return out
+
 
 PHASE_LABELS: dict[str, str] = {
-    # lite
-    "LT0": "Source Recon", "LT1": "Secret Exposure Scan", "LT2": "Fast Static Analysis",
-    "LT3": "PoC + Consolidate", "LT4": "Verify & Cleanup",
-    # balanced
-    "BL1": "Intelligence & Dependency Risk", "BL2": "Architecture & Threat Model",
-    "BL3": "Static Analysis & Triage", "BL4": "Manual Attack Surface Probe",
-    "BL5": "Adversarial Review & FP Check", "BL6": "Proof-of-Concept Construction",
-    "BL6b": "Finding Report Drafting", "BL6c": "Final Report Assembly",
-    "BL7": "Verification & Cleanup",
-    # deep
-    "DP1": "Intelligence & Dependency Risk", "DP2": "Patch History & Bypass Review",
-    "DP3": "Architecture & Threat Model", "DP4": "Static Analysis & Triage",
-    "DP5": "Authorization & Access Control", "DP6": "State Machine & Concurrency",
-    "DP7": "Spec, Framework & Parser Gaps", "DP8": "Manual Attack Surface Probe",
-    "DP9": "Cross-Service Data Flow", "DP10": "Adversarial Review Chamber",
-    "DP11": "False-Positive Verification", "DP12": "Variant Search",
-    "DP13": "Proof-of-Concept Construction", "DP14": "Finding Report Drafting",
-    "DP15": "Final Report Assembly", "DP16": "Finding Verification", "DP17": "Cleanup",
-    # confirm
-    "CF1": "Findings Inventory + Report Repair", "CF1_5": "Intent Cross-Check",
-    "CF2": "Environment Discovery", "CF3": "Environment Provisioning",
-    "CF4": "Proof-of-Concept Execution", "CF5": "Test-Based Fallback",
-    "CF6": "Confirmation Report", "CF7": "Cleanup & Redaction",
+    "recon": "Source Recon", "sweep": "Secret Exposure Scan",
+    "intent": "Intent Cartography", "intel": "Intelligence & Dependency Risk",
+    "kb": "Architecture & Threat Model", "history": "Patch History & Bypass Review",
+    "hunt": "Static Analysis & Triage", "authz": "Authorization & Access Control",
+    "state": "State Machine & Concurrency", "spec": "Spec, Framework & Parser Gaps",
+    "probe": "Manual Attack Surface Probe", "crossservice": "Cross-Service Data Flow",
+    "chamber": "Adversarial Review Chamber", "verify": "False-Positive Verification",
+    "variant": "Variant Search", "crosscheck": "Intent Cross-Check",
+    "poc": "Proof-of-Concept Construction", "report": "Finding Report Drafting",
+    "render": "Final Report Assembly",
+    "inventory": "Findings Inventory + Report Repair", "envscan": "Environment Discovery",
+    "provision": "Environment Provisioning", "exploit": "Proof-of-Concept Execution",
+    "testgen": "Test-Based Fallback", "certify": "Confirmation Report",
+    "cleanup": "Cleanup & Redaction",
 }
 
 # phase -> executor. "core:<fn>" = deterministic engine step; else = sub-agent name.
 PHASE_AGENT: dict[str, str] = {
-    "LT0": "core:recon", "LT1": "core:sweep", "LT2": "kavach-sast",
-    "LT3": "kavach-poc", "LT4": "core:cleanup",
-    "BL1": "kavach-intel", "BL2": "kavach-kb", "BL3": "kavach-sast", "BL4": "kavach-probe",
-    "BL5": "kavach-chamber", "BL6": "kavach-poc", "BL6b": "kavach-reporter",
-    "BL6c": "core:render", "BL7": "core:cleanup",
-    "DP1": "kavach-intel", "DP2": "kavach-history", "DP3": "kavach-kb", "DP4": "kavach-sast",
-    "DP5": "kavach-api", "DP6": "kavach-state", "DP7": "kavach-spec", "DP8": "kavach-probe",
-    "DP9": "kavach-crossservice", "DP10": "kavach-chamber", "DP11": "kavach-verifier",
-    "DP12": "kavach-variant", "DP13": "kavach-poc", "DP14": "kavach-reporter",
-    "DP15": "core:render", "DP16": "kavach-confirm-reporter", "DP17": "core:cleanup",
-    "CF1": "core:inventory", "CF1_5": "kavach-intent-crosscheck", "CF2": "kavach-env-detective",
-    "CF3": "kavach-env-provisioner", "CF4": "kavach-poc-executor", "CF5": "kavach-test-mapper",
-    "CF6": "kavach-confirm-reporter", "CF7": "core:cleanup",
+    "recon": "core:recon", "sweep": "core:sweep",
+    "intent": "kavach-intent", "intel": "kavach-intel", "kb": "kavach-kb",
+    "history": "kavach-history", "hunt": "kavach-sast",
+    "authz": "kavach-api", "state": "kavach-state", "spec": "kavach-spec",
+    "probe": "kavach-probe", "crossservice": "kavach-crossservice",
+    "chamber": "kavach-chamber", "verify": "kavach-verifier",
+    "variant": "kavach-variant", "crosscheck": "kavach-intent-crosscheck",
+    "poc": "kavach-poc", "report": "kavach-reporter", "render": "core:render",
+    "inventory": "core:inventory", "envscan": "kavach-env-detective",
+    "provision": "kavach-env-provisioner", "exploit": "kavach-poc-executor",
+    "testgen": "kavach-test-mapper", "certify": "kavach-confirm-reporter",
+    "cleanup": "core:cleanup",
 }
 
 # phase -> required artifact globs (relative to the audit dir) that prove completion.
@@ -96,82 +126,47 @@ PHASE_AGENT: dict[str, str] = {
 # in cleanup.TRANSIENT. A gate that cleanup deletes makes its phase eligible again on
 # every resume, which is how a run pays for the same fan-out twice.
 PHASE_GATES: dict[str, list[str]] = {
-    "LT0": ["recon.json"], "LT1": ["sweep-summary.json"], "LT2": ["attack-surface/lite-q2-summary.md"],
-    "LT3": ["attack-surface/poc-coverage.json"], "LT4": ["attack-surface/lite-cleanup-summary.json"],
-    "BL1": ["attack-surface/advisory-summary.md"], "BL2": ["attack-surface/knowledge-base-report.md"],
-    "BL3": ["attack-surface/source-sink-flows-all-severities.md"],
-    "BL4": ["attack-surface/manual-attack-surface-inventory.md"],
-    "BL5": ["attack-surface/balanced-chamber-summary.md"],
-    "BL6": ["attack-surface/poc-coverage.json"], "BL6b": ["attack-surface/report-coverage.json"],
-    "BL6c": ["reports/final-audit-report.md"],
-    "BL7": ["attack-surface/balanced-cleanup-summary.json"],
-    "DP1": ["attack-surface/advisory-summary.md"], "DP2": ["attack-surface/patch-bypass-summary.md"],
-    "DP3": ["attack-surface/knowledge-base-report.md"],
-    "DP4": ["attack-surface/source-sink-flows-all-severities.md"],
-    "DP5": ["attack-surface/authz-matrix.md"], "DP6": ["attack-surface/state-concurrency-summary.md"],
-    "DP7": ["attack-surface/spec-gap-summary.md"], "DP8": ["attack-surface/deep-probe-summary.md"],
-    "DP9": ["attack-surface/cross-service-edges.json"],
-    "DP10": ["attack-surface/deep-chamber-summary.md"],
-    "DP11": ["attack-surface/adversarial-verification.md"],
-    "DP12": ["attack-surface/variant-summary.md"],
-    "DP13": ["attack-surface/poc-coverage.json"], "DP14": ["attack-surface/report-coverage.json"],
-    "DP15": ["reports/final-audit-report.md"],
-    "DP16": ["reports/confirmation-report.md"],
-    "DP17": ["attack-surface/deep-cleanup-summary.json"],
-    "CF1": ["attack-surface/confirm-findings-inventory.json"],
-    "CF1_5": ["attack-surface/confirm-intent-crosscheck.json"],
-    "CF2": ["attack-surface/confirm-env-strategies.json"],
-    "CF3": ["attack-surface/confirm-env-connection.json"],
-    "CF4": ["attack-surface/confirm-poc-results.json"],
-    "CF5": ["attack-surface/confirm-test-mapping.json"],
-    "CF6": ["reports/confirmation-report.md"],
-    "CF7": ["attack-surface/confirm-cleanup-summary.json"],
+    "recon": ["recon.json"], "sweep": ["sweep-summary.json"],
+    "intent": ["attack-surface/intent-corpus.json"],
+    "intel": ["attack-surface/advisory-summary.md"],
+    "kb": ["attack-surface/knowledge-base-report.md"],
+    "history": ["attack-surface/patch-bypass-summary.md"],
+    "hunt": ["attack-surface/source-sink-flows-all-severities.md"],
+    "authz": ["attack-surface/authz-matrix.md"],
+    "state": ["attack-surface/state-concurrency-summary.md"],
+    "spec": ["attack-surface/spec-gap-summary.md"],
+    "probe": ["attack-surface/deep-probe-summary.md"],
+    "crossservice": ["attack-surface/cross-service-edges.json"],
+    "chamber": ["attack-surface/deep-chamber-summary.md"],
+    "verify": ["attack-surface/adversarial-verification.md"],
+    "variant": ["attack-surface/variant-summary.md"],
+    "crosscheck": ["attack-surface/confirm-intent-crosscheck.json"],
+    "poc": ["attack-surface/poc-coverage.json"],
+    "report": ["attack-surface/report-coverage.json"],
+    "render": ["reports/final-audit-report.md"],
+    "inventory": ["attack-surface/confirm-findings-inventory.json"],
+    "envscan": ["attack-surface/confirm-env-strategies.json"],
+    "provision": ["attack-surface/confirm-env-connection.json"],
+    "exploit": ["attack-surface/confirm-poc-results.json"],
+    "testgen": ["attack-surface/confirm-test-mapping.json"],
+    "certify": ["reports/confirmation-report.md"],
+    # Not mode-flavoured, unlike the three per-mode names it replaces: one phase shared by
+    # three presets cannot gate on a filename that varies with the preset.
+    "cleanup": ["attack-surface/cleanup-summary.json"],
 }
 
 
-def phases_for(mode: str) -> list[str]:
-    return list(MODE_PHASES[mode])
+def phases_for(mode: str, live: bool = False) -> list[str]:
+    members = _members(mode, live)
+    return [p for p in PIPELINE if p in members]
 
 
-def prereqs_for(mode: str, phase: str) -> list[str]:
-    return list(PREREQS[mode].get(phase, []))
+def prereqs_for(mode: str, phase: str, live: bool = False) -> list[str]:
+    return _induced(phase, _members(mode, live))
 
 
 def gate_for(phase: str) -> list[str]:
     return list(PHASE_GATES.get(phase, []))
-
-
-# --- the deterministic passes a mode may not schedule for itself -----------------------
-#
-# `recon` walks the tree and writes `recon.json` + `file-manifest.txt`. `sweep` runs the
-# scanners and is the *only* verb that writes `findings.json`. Almost everything downstream
-# reads one of those: `scope` ranks the manifest, and `slice`, `triage` and `render` all
-# read findings.json.
-#
-# `lite` opens with `core:recon` and `core:sweep`, so it prepares itself. `balanced` and
-# `deep` list neither. SKILL.md tells an orchestrator to run recon up front for the two
-# modes it names, but the requirement is not special to them and it is not only recon - a
-# `balanced` run driven without a sweep sends every hunter an empty slice and then fails
-# in its report tail on a findings.json nothing wrote.
-#
-# Reported as data rather than left in prose, so a harness does not have to carry the list.
-PREREQ_ARTIFACTS: tuple[tuple[str, str, str], ...] = (
-    ("recon", "recon.json", "core:recon"),
-    ("sweep", "findings.json", "core:sweep"),
-)
-
-
-def missing_prerequisites(audit_dir: str, mode: str) -> list[dict]:
-    """Which deterministic passes this mode needs, does not schedule, and does not have."""
-    scheduled = {PHASE_AGENT.get(p, "") for p in phases_for(mode)}
-    missing = []
-    for verb, artifact, executor in PREREQ_ARTIFACTS:
-        if executor in scheduled:
-            continue
-        if os.path.exists(os.path.join(os.path.abspath(audit_dir), artifact)):
-            continue
-        missing.append({"verb": verb, "artifact": artifact})
-    return missing
 
 
 # --- the dispatch contract -------------------------------------------------------------
@@ -189,7 +184,7 @@ def missing_prerequisites(audit_dir: str, mode: str) -> list[dict]:
 
 BASE_REFERENCES: tuple[str, ...] = ("persona.md", "finding-schema.md", "severity-model.md")
 
-# The eight domain hunters of BL3/DP4, in dispatch order. kavach-sast leads because it owns
+# The eight domain hunters of `hunt`, in dispatch order. kavach-sast leads because it owns
 # the phase's literal gate artifact, so the gate can close in the first batch.
 DOMAIN_ROSTER: tuple[str, ...] = (
     "kavach-sast", "kavach-api", "kavach-llm", "kavach-billing",
@@ -275,91 +270,67 @@ _VARIANT_TASK = (
 )
 
 PHASE_SPECS: dict[str, PhaseSpec] = {
-    # lite
-    "LT2": PhaseSpec(_SCAN_TASK + " You own this phase's gate artifact.",
-                     roster=("kavach-sast",)),
-    "LT3": PhaseSpec(_POC_TASK),
-    # balanced
-    "BL1": PhaseSpec(
+    "intent": PhaseSpec(
+        "Mine repo-local security documentation into a cited corpus of behaviors this project "
+        "declares intentional and risks it explicitly acknowledges."),
+    "intel": PhaseSpec(
         "Sweep published advisories (CVE/GHSA/OSV/NVD) for the detected stack and inventory "
         "every third-party component the target relies on. Never invent an advisory id."),
-    "BL2": PhaseSpec(
+    "kb": PhaseSpec(
         "Build the threat model: classify the project, map trust boundaries and data flow "
         "into DFD/CFD slices, and carve out the unauthenticated attack surface the rest of "
         "the audit leans on. Read recon.json rather than rediscovering the stack.",
         references=("attack-trees.md",)),
-    "BL3": PhaseSpec(_SCAN_TASK, roster=DOMAIN_ROSTER),
-    "BL4": PhaseSpec(
-        "Probe the attack surface the domain pass just built, by hand. Scanners are done; "
-        "what is left is the reasoning they cannot do.",
-        references=("probe-protocol.md",)),
-    "BL5": PhaseSpec(_CHAMBER_TASK),
-    "BL6": PhaseSpec(_POC_TASK),
-    "BL6b": PhaseSpec(_REPORT_TASK),
-    # deep
-    "DP1": PhaseSpec(
-        "Sweep published advisories (CVE/GHSA/OSV/NVD) for the detected stack and inventory "
-        "every third-party component the target relies on. Never invent an advisory id."),
-    "DP2": PhaseSpec(
+    "history": PhaseSpec(
         "Mine the git history for security-relevant commits carrying no CVE/GHSA label, then "
         "review each candidate patch for soundness across the seven bypass vectors. History "
         "runs first; the bypass review needs its commit context and owns the gate artifact.",
         roster=("kavach-history", "kavach-patch"), sequential=True),
-    "DP3": PhaseSpec(
-        "Build the threat model: classify the project, map trust boundaries and data flow "
-        "into DFD/CFD slices, and carve out the unauthenticated attack surface the rest of "
-        "the audit leans on. Read recon.json rather than rediscovering the stack.",
-        references=("attack-trees.md",)),
-    "DP4": PhaseSpec(_SCAN_TASK, roster=DOMAIN_ROSTER),
-    "DP5": PhaseSpec(
+    "hunt": PhaseSpec(_SCAN_TASK, roster=DOMAIN_ROSTER),
+    "authz": PhaseSpec(
         "Trace every endpoint for BOLA/IDOR, BFLA, broken auth, mass assignment, excessive "
         "data exposure and missing rate limits, and write the authorization matrix."),
-    "DP6": PhaseSpec(
+    "state": PhaseSpec(
         "Mine state-holding entities and concurrency primitives, then sweep for TOCTOU, "
         "isolation bugs, state-ordering violations, idempotency failures and double-submit "
         "races - the temporal bugs syntactic analysis misses."),
-    "DP7": PhaseSpec(
+    "spec": PhaseSpec(
         "Find security-relevant gaps between the specs and framework contracts this codebase "
         "implements and what it actually does: parsing, normalization, canonicalization, "
         "state-machine compliance, middleware semantics."),
-    "DP8": PhaseSpec(
+    "probe": PhaseSpec(
         "Run the deep-probe team over each component: map the attack surface, dispatch both "
         "reasoners in parallel for independent hypothesis rounds, cross-pollinate, then "
         "harvest causal-challenged evidence before any verdict.",
         references=("probe-protocol.md",)),
-    "DP9": PhaseSpec(
+    "crossservice": PhaseSpec(
         "Stitch inter-component data flows into one edge graph and propagate taint across "
         "service boundaries single-codebase analysis cannot follow. A clean no-op on a "
         "single-service project is a valid result."),
-    "DP10": PhaseSpec(_CHAMBER_TASK),
-    "DP11": PhaseSpec(_VERIFY_TASK),
-    "DP12": PhaseSpec(_VARIANT_TASK),
-    "DP13": PhaseSpec(_POC_TASK),
-    "DP14": PhaseSpec(_REPORT_TASK),
-    "DP16": PhaseSpec(
-        "Aggregate every confirm_status verdict this run produced into the confirmation "
-        "report. The nine states are orthogonal metadata, never a second severity axis.",
-        references=("certification.md",)),
-    # confirm
-    "CF1_5": PhaseSpec(
+    "chamber": PhaseSpec(_CHAMBER_TASK),
+    "verify": PhaseSpec(_VERIFY_TASK),
+    "variant": PhaseSpec(_VARIANT_TASK),
+    "crosscheck": PhaseSpec(
         "Compare each draft finding against the intent corpus and emit match / partial / no "
         "/ contested per finding. Annotate; never touch severity or confirm status.",
         inputs=("attack-surface/intent-corpus.json",)),
-    "CF2": PhaseSpec(
+    "poc": PhaseSpec(_POC_TASK),
+    "report": PhaseSpec(_REPORT_TASK),
+    "envscan": PhaseSpec(
         "Discover every way this application can be built, run and tested, plus its "
         "datastores, required env vars and auth scaffolding. Discovery only - build nothing."),
-    "CF3": PhaseSpec(
+    "provision": PhaseSpec(
         "Provision the sandboxed application by walking the discovered strategies top to "
         "bottom. Refuse any target you cannot positively confirm is sandboxed or local."),
-    "CF4": PhaseSpec(
+    "exploit": PhaseSpec(
         "Execute each finding's PoC against the live sandboxed application, parse its "
         "structured verdict, and record confirm_status plus evidence. State the blast radius "
         "and wait for explicit go-ahead before every exploit attempt."),
-    "CF5": PhaseSpec(
+    "testgen": PhaseSpec(
         "For findings live execution could not confirm, generate a minimal inverted-assertion "
         "reproducer in the target's own test framework and run it under double-timeout "
         "discipline."),
-    "CF6": PhaseSpec(
+    "certify": PhaseSpec(
         "Aggregate every confirm_status verdict this run produced into the confirmation "
         "report. The nine states are orthogonal metadata, never a second severity axis.",
         references=("certification.md",)),
@@ -374,9 +345,12 @@ def spec_for(phase: str) -> PhaseSpec:
         "artifact.")
 
 
-def roster_for(phase: str) -> list[str]:
+def roster_for(phase: str, mode: str) -> list[str]:
     """The agents this phase dispatches, in order. A single-agent phase returns its one
     executor; a `core:` phase returns nothing to dispatch."""
+    override = PRESET_ROSTERS.get(mode, {}).get(phase)
+    if override is not None:
+        return list(override)
     spec = PHASE_SPECS.get(phase)
     if spec is not None and spec.roster:
         return list(spec.roster)
@@ -393,12 +367,12 @@ def references_for(phase: str, agent: str | None = None) -> list[str]:
     return out
 
 
-def inputs_for(mode: str, phase: str) -> list[str]:
+def inputs_for(mode: str, phase: str, live: bool = False) -> list[str]:
     """Audit-relative artifacts this phase reads. A phase's prereqs' gate artifacts are
     exactly what the phases before it produced for it, so they are inherited rather than
     restated - `findings` is a directory gate, not a file, and is dropped."""
     out = ["recon.json", "findings.json"]
-    for prereq in prereqs_for(mode, phase):
+    for prereq in prereqs_for(mode, phase, live):
         for artifact in gate_for(prereq):
             if artifact != "findings" and artifact not in out:
                 out.append(artifact)

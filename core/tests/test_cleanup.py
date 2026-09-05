@@ -19,7 +19,7 @@ class TestCleanup(unittest.TestCase):
         os.makedirs(os.path.join(self.dir, "attack-surface"))
         os.makedirs(os.path.join(self.dir, "findings", "C1-x"))
         os.makedirs(os.path.join(self.dir, "reports"))
-        os.makedirs(os.path.join(self.dir, "runs", "dp4"))
+        os.makedirs(os.path.join(self.dir, "runs", "hunt"))
         open(os.path.join(self.dir, "final-audit-report.md"), "w").write("x")
 
     def _write(self, name: str) -> str:
@@ -39,20 +39,22 @@ class TestCleanup(unittest.TestCase):
 
     def test_summary_written(self):
         cleanup.cleanup(self.dir, "balanced")
-        p = os.path.join(self.dir, "attack-surface", "balanced-cleanup-summary.json")
+        p = os.path.join(self.dir, "attack-surface", "cleanup-summary.json")
         self.assertTrue(os.path.exists(p))
-        json.load(open(p))
+        # The filename is mode-independent - one `cleanup` phase, one gate string across
+        # three presets - so the mode it ran for is carried in the payload instead.
+        self.assertEqual(json.load(open(p))["mode"], "balanced")
 
     def test_reports_and_runs_are_durable(self):
         summary = cleanup.cleanup(self.dir, "deep")
         self.assertTrue(os.path.isdir(os.path.join(self.dir, "reports")))
-        self.assertTrue(os.path.isdir(os.path.join(self.dir, "runs", "dp4")))
+        self.assertTrue(os.path.isdir(os.path.join(self.dir, "runs", "hunt")))
         self.assertIn("reports", summary["retained"])
         self.assertIn("runs", summary["retained"])
 
     def test_final_audit_report_stays_at_the_root(self):
-        # BL6c/DP15/RV11c gate on .kavach/final-audit-report.md; moving it is the
-        # integrator's job, not cleanup's.
+        # `render` gates on .kavach/final-audit-report.md; moving it is the integrator's
+        # job, not cleanup's.
         cleanup.cleanup(self.dir, "balanced")
         self.assertTrue(os.path.exists(os.path.join(self.dir, "final-audit-report.md")))
 

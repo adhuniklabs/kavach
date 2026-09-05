@@ -165,7 +165,7 @@ def agent_from_result(result_path: str) -> str:
 def load_agent_findings(result_path: str) -> list[Finding]:
     """The findings in one agent-authored result, attributed to the dispatch that wrote it.
 
-    A result with no ``findings`` key is not corrupt: BL4's probe result is a protocol status
+    A result with no ``findings`` key is not corrupt: `probe`'s result is a protocol status
     object, and quarantining it left the phase re-planning a dispatch that had already done its
     work. `findings.json` keeps the strict read - a missing key *there* is an engine bug.
     """
@@ -185,8 +185,8 @@ def ingest(audit_dir: str, phase: str, result_path: str) -> tuple[int, int]:
     the report as inflated counts.
     """
     findings = load_agent_findings(result_path)
-    # fan-out phases (BL3/DP4, LS2, ...) ingest several concurrent dispatches under the
-    # same phase id; without a lock, two processes can read the same next-draft-number
+    # a fan-out phase (`hunt`, `history`, ...) ingests several concurrent dispatches under
+    # the same phase id; without a lock, two processes can read the same next-draft-number
     # before either writes, and the second write clobbers the first's draft. The same lock
     # makes the already-drafted check safe against a concurrent ingest of a sibling result.
     written = skipped = 0
@@ -269,9 +269,10 @@ def phase_prompt(mode: str, phase: str, audit_dir: str, target: str, *,
         body += ["", f"  Not installed on this machine, so unavailable to you: {', '.join(missing)}"]
     body += ["", "Audit inputs:", _bullets(inputs), "", "---", "",
              "## Your task", "", spec.task]
-    if spec.roster and len(spec.roster) > 1:
-        peers = ", ".join(a for a in spec.roster if a != executor)
-        body += ["", f"You are one of {len(spec.roster)} agents on this phase "
+    roster = modes.roster_for(phase, mode)
+    if len(roster) > 1:
+        peers = ", ".join(a for a in roster if a != executor)
+        body += ["", f"You are one of {len(roster)} agents on this phase "
                      f"({'in sequence' if spec.sequential else 'running concurrently'}). "
                      f"The others are: {peers}. Cover your own domain and do not duplicate theirs."]
     return compose_prompt(mode, phase, "\n".join(body), audit_dir, target,
@@ -282,7 +283,7 @@ def dispatch_plan(mode: str, phase: str, audit_dir: str, target: str) -> dict:
     """Everything a harness needs to run one phase without consulting the registry itself:
     who to dispatch, how many, what each one writes, and what closes the gate."""
     executor = modes.PHASE_AGENT.get(phase, "")
-    roster = modes.roster_for(phase)
+    roster = modes.roster_for(phase, mode)
     out = os.path.abspath(audit_dir)
     return {
         "phase": phase,

@@ -195,12 +195,12 @@ class TestCoverageIsScoped(unittest.TestCase):
 
     def test_the_gate_can_close_once_the_live_finding_has_its_poc(self):
         coverage.write_coverage(self.dir, "poc")
-        self.assertFalse(runner.gate_satisfied(self.dir, "BL6"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "poc"))
         with open(os.path.join(self.created[0], "poc.theoretical.md"), "w",
                   encoding="utf-8") as fh:
             fh.write("# Theoretical\n\nNo safe live repro.\n")
         coverage.write_coverage(self.dir, "poc")
-        self.assertTrue(runner.gate_satisfied(self.dir, "BL6"))
+        self.assertTrue(runner.gate_satisfied(self.dir, "poc"))
 
     def test_the_written_artifact_carries_the_new_keys(self):
         path = coverage.write_coverage(self.dir, "report")

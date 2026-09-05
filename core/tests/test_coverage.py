@@ -123,21 +123,21 @@ class TestCoverageGatesThePhase(unittest.TestCase):
     def test_deep_poc_phase_stays_open_until_the_poc_exists(self):
         dirs = findings_tree.consolidate(self.dir, [_reasoned()])
         coverage.write_coverage(self.dir, "poc")
-        self.assertFalse(runner.gate_satisfied(self.dir, "DP13"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "poc"))
 
         with open(os.path.join(dirs[0], "poc.theoretical.md"), "w", encoding="utf-8") as fh:
             fh.write("# Theoretical\n\nNo safe live repro.\n")
         coverage.write_coverage(self.dir, "poc")
-        self.assertTrue(runner.gate_satisfied(self.dir, "DP13"))
+        self.assertTrue(runner.gate_satisfied(self.dir, "poc"))
 
     def test_report_phase_stays_open_until_the_report_passes_the_contract(self):
         dirs = findings_tree.consolidate(self.dir, [_reasoned()])
         coverage.write_coverage(self.dir, "report")
-        self.assertFalse(runner.gate_satisfied(self.dir, "DP14"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "report"))
 
         report_finding.write_report(dirs[0], _reasoned())
         coverage.write_coverage(self.dir, "report")
-        self.assertTrue(runner.gate_satisfied(self.dir, "DP14"))
+        self.assertTrue(runner.gate_satisfied(self.dir, "report"))
 
     def test_stale_coverage_artifact_does_not_satisfy_a_new_finding(self):
         # the failure mode this closes: coverage written once, then a phase promotes more
@@ -145,11 +145,11 @@ class TestCoverageGatesThePhase(unittest.TestCase):
         with open(os.path.join(dirs[0], "poc.theoretical.md"), "w", encoding="utf-8") as fh:
             fh.write("# Theoretical\n\nNo safe live repro.\n")
         coverage.write_coverage(self.dir, "poc")
-        self.assertTrue(runner.gate_satisfied(self.dir, "DP13"))
+        self.assertTrue(runner.gate_satisfied(self.dir, "poc"))
 
         findings_tree.consolidate(self.dir, [_reasoned(), _reasoned("Mass assignment on /users")])
         coverage.write_coverage(self.dir, "poc")
-        self.assertFalse(runner.gate_satisfied(self.dir, "DP13"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "poc"))
 
 
 if __name__ == "__main__":

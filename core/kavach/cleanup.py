@@ -63,7 +63,7 @@ def cleanup(audit_dir: str, mode: str) -> dict:
     os.makedirs(os.path.join(audit_dir, "attack-surface"), exist_ok=True)
     summary = {"mode": mode, "removed": removed, "retained": retained, "missing": missing,
                "unexpected": _unexpected(audit_dir)}
-    with open(os.path.join(audit_dir, "attack-surface", f"{mode}-cleanup-summary.json"),
+    with open(os.path.join(audit_dir, "attack-surface", "cleanup-summary.json"),
               "w", encoding="utf-8") as fh:
         json.dump(summary, fh, indent=2)
     return summary

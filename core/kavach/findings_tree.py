@@ -362,8 +362,8 @@ def _assign(band: str, held: tuple[str, str] | None, counters: dict[str, int]) -
 
 
 def consolidate(audit_dir: str, findings: list[Finding]) -> list[str]:
-    # Always create findings/, even on a zero-finding run - phases whose gate is just
-    # ["findings"] (RV9/RV10/RV10k, MG6, ...) would otherwise never be satisfiable.
+    # Always create findings/, even on a zero-finding run - a phase whose gate is just
+    # ["findings"] would otherwise never be satisfiable.
     os.makedirs(os.path.join(audit_dir, "findings"), exist_ok=True)
     findings = triage.classify_all(findings)
     promoted, grouped = partition(findings)

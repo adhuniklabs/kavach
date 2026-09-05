@@ -49,27 +49,27 @@ class TestResolvePriorCommit(unittest.TestCase):
         self.assertIsNone(diffing.resolve_prior_commit(self.dir))
 
     def test_in_progress_audit_not_used(self):
-        state.init_audit(self.dir, "balanced", ["BL1"], commit="abc123", repository="o/r")
+        state.init_audit(self.dir, "balanced", ["intel"], commit="abc123", repository="o/r")
         self.assertIsNone(diffing.resolve_prior_commit(self.dir))
 
     def test_latest_complete_audit_commit(self):
-        run = state.init_audit(self.dir, "balanced", ["BL1"], commit="abc123", repository="o/r")
+        run = state.init_audit(self.dir, "balanced", ["intel"], commit="abc123", repository="o/r")
         state.mutate_state(self.dir, lambda f: setattr(f.audits[0], "status", RunStatus.COMPLETE))
         self.assertEqual(diffing.resolve_prior_commit(self.dir), "abc123")
 
     def test_walks_backward_past_in_progress_to_last_complete(self):
-        state.init_audit(self.dir, "balanced", ["BL1"], commit="c1", repository="o/r")
+        state.init_audit(self.dir, "balanced", ["intel"], commit="c1", repository="o/r")
         state.mutate_state(self.dir, lambda f: setattr(f.audits[0], "status", RunStatus.COMPLETE))
-        state.init_audit(self.dir, "balanced", ["BL1"], commit="c2", repository="o/r")  # in_progress
+        state.init_audit(self.dir, "balanced", ["intel"], commit="c2", repository="o/r")  # in_progress
         self.assertEqual(diffing.resolve_prior_commit(self.dir), "c1")
 
     def test_walks_backward_past_no_git_complete_run_to_older_complete_with_commit(self):
         # the newest COMPLETE run has commit=None (target had no git history at the time);
         # that's not a usable diff baseline, so keep walking back for an older COMPLETE
         # run that does have a commit, instead of stopping on the newest regardless.
-        state.init_audit(self.dir, "balanced", ["BL1"], commit="c1", repository="o/r")
+        state.init_audit(self.dir, "balanced", ["intel"], commit="c1", repository="o/r")
         state.mutate_state(self.dir, lambda f: setattr(f.audits[0], "status", RunStatus.COMPLETE))
-        state.init_audit(self.dir, "balanced", ["BL1"], commit=None, repository="o/r")
+        state.init_audit(self.dir, "balanced", ["intel"], commit=None, repository="o/r")
         state.mutate_state(self.dir, lambda f: setattr(f.audits[1], "status", RunStatus.COMPLETE))
         self.assertEqual(diffing.resolve_prior_commit(self.dir), "c1")
 

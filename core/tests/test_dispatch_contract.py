@@ -1,6 +1,6 @@
 """The dispatch contract: everything a harness needs comes from the engine, not from prose.
 
-`phase-prompt` used to emit one line - "Execute phase BL3 (Static Analysis & Triage)." -
+`phase-prompt` used to emit one line - "Execute phase hunt (Static Analysis & Triage)." -
 and the actual instruction lived in SKILL.md, so any harness that was not SKILL.md had to
 re-read that prose and re-encode it. These tests pin the contract that replaced it.
 """
@@ -13,7 +13,7 @@ import unittest
 from kavach import agentdefs, dispatch, modes, paths, slicing, triage
 from kavach.finding import Finding, Location, Severity
 
-AGENT_PHASES = [(m, p) for m, phases in modes.MODE_PHASES.items() for p in phases
+AGENT_PHASES = [(m, p) for m in modes.MODES for p in modes.phases_for(m, live=True)
                 if not modes.PHASE_AGENT.get(p, "core:none").startswith("core:")]
 
 
@@ -27,16 +27,16 @@ class TestPhaseSpecs(unittest.TestCase):
         roster = agentdefs.load_all()
         if not roster:
             self.skipTest("agents/ not installed beside the core")
-        for _, phase in AGENT_PHASES:
-            for agent in modes.roster_for(phase):
+        for mode, phase in AGENT_PHASES:
+            for agent in modes.roster_for(phase, mode):
                 self.assertIn(agent, roster, f"{phase} dispatches unknown agent {agent}")
 
     def test_every_reference_named_exists(self):
         base = paths.references_dir()
         if base is None:
             self.skipTest("references/ not installed beside the core")
-        for _, phase in AGENT_PHASES:
-            for agent in modes.roster_for(phase) or [None]:
+        for mode, phase in AGENT_PHASES:
+            for agent in modes.roster_for(phase, mode) or [None]:
                 for name in modes.references_for(phase, agent):
                     self.assertTrue(os.path.exists(os.path.join(base, name)),
                                     f"{phase}/{agent}: missing reference {name}")
@@ -49,22 +49,23 @@ class TestPhaseSpecs(unittest.TestCase):
             self.assertIn(name, roster)
 
     def test_fanout_phases_declare_their_whole_roster(self):
-        """BL3/DP4 dispatch eight hunters. A roster of one there means seven domains are
-        silently never audited - the failure mode is a clean-looking report."""
-        for phase in ("BL3", "DP4"):
-            self.assertEqual(modes.roster_for(phase), list(modes.DOMAIN_ROSTER))
+        """`hunt` dispatches eight hunters at balanced and deep. A roster of one there
+        means seven domains are silently never audited - the failure mode is a
+        clean-looking report."""
+        for mode in ("balanced", "deep"):
+            self.assertEqual(modes.roster_for("hunt", mode), list(modes.DOMAIN_ROSTER))
 
     def test_single_agent_phase_falls_back_to_phase_agent(self):
-        self.assertEqual(modes.roster_for("BL4"), ["kavach-probe"])
+        self.assertEqual(modes.roster_for("probe", "balanced"), ["kavach-probe"])
 
     def test_core_phase_dispatches_nothing(self):
-        self.assertEqual(modes.roster_for("BL6c"), [])
-        self.assertEqual(modes.roster_for("BL7"), [])
+        self.assertEqual(modes.roster_for("render", "balanced"), [])
+        self.assertEqual(modes.roster_for("cleanup", "balanced"), [])
 
     def test_inputs_inherit_prereq_gates(self):
-        got = modes.inputs_for("deep", "DP8")
-        self.assertIn("attack-surface/knowledge-base-report.md", got)   # DP3's gate
-        self.assertIn("attack-surface/source-sink-flows-all-severities.md", got)  # DP4's
+        got = modes.inputs_for("deep", "probe")
+        self.assertIn("attack-surface/knowledge-base-report.md", got)   # kb's gate
+        self.assertIn("attack-surface/source-sink-flows-all-severities.md", got)  # hunt's
         self.assertNotIn("findings", got)   # a directory gate is not a readable input
 
 
@@ -73,14 +74,14 @@ class TestPhasePrompt(unittest.TestCase):
         self.dir = tempfile.mkdtemp()
 
     def test_prompt_carries_header_task_and_result_path(self):
-        p = dispatch.phase_prompt("balanced", "BL3", self.dir, "/repo",
+        p = dispatch.phase_prompt("balanced", "hunt", self.dir, "/repo",
                                   agent="kavach-sast", index=1)
         self.assertIn("Static Analysis & Triage", p)
         self.assertIn("scanner hit", p)
-        self.assertIn(os.path.join("runs", "bl3", "kavach-sast-1.json"), p)
+        self.assertIn(os.path.join("runs", "hunt", "kavach-sast-1.json"), p)
 
     def test_fanout_prompt_names_the_peers_so_domains_are_not_duplicated(self):
-        p = dispatch.phase_prompt("deep", "DP4", self.dir, "/repo", agent="kavach-billing",
+        p = dispatch.phase_prompt("deep", "hunt", self.dir, "/repo", agent="kavach-billing",
                                   index=4)
         self.assertIn("one of 8 agents", p)
         self.assertIn("kavach-sast", p)
@@ -91,7 +92,7 @@ class TestPhasePrompt(unittest.TestCase):
         is told what it could not be given rather than being left to assume it had it."""
         os.environ["KAVACH_REFERENCES_DIR"] = os.path.join(self.dir, "nope")
         try:
-            p = dispatch.phase_prompt("balanced", "BL3", self.dir, "/repo",
+            p = dispatch.phase_prompt("balanced", "hunt", self.dir, "/repo",
                                       agent="kavach-sast", index=1)
         finally:
             del os.environ["KAVACH_REFERENCES_DIR"]
@@ -99,12 +100,12 @@ class TestPhasePrompt(unittest.TestCase):
         self.assertIn("persona.md", p)
 
     def test_only_inputs_that_exist_are_named(self):
-        p = dispatch.phase_prompt("balanced", "BL2", self.dir, "/repo")
+        p = dispatch.phase_prompt("balanced", "kb", self.dir, "/repo")
         self.assertIn("Audit inputs:", p)
         self.assertNotIn("recon.json", p.split("Audit inputs:")[1].split("---")[0])
         with open(os.path.join(self.dir, "recon.json"), "w", encoding="utf-8") as fh:
             fh.write("{}")
-        p = dispatch.phase_prompt("balanced", "BL2", self.dir, "/repo")
+        p = dispatch.phase_prompt("balanced", "kb", self.dir, "/repo")
         self.assertIn("recon.json", p.split("Audit inputs:")[1].split("---")[0])
 
 
@@ -113,7 +114,7 @@ class TestDispatchPlan(unittest.TestCase):
         self.dir = tempfile.mkdtemp()
 
     def test_fanout_plan_gives_every_dispatch_a_distinct_result_path(self):
-        plan = dispatch.dispatch_plan("balanced", "BL3", self.dir, "/repo")
+        plan = dispatch.dispatch_plan("balanced", "hunt", self.dir, "/repo")
         self.assertEqual(plan["kind"], "fanout")
         self.assertEqual(plan["planned"], 8)
         paths_out = [d["result_path"] for d in plan["dispatches"]]
@@ -121,22 +122,22 @@ class TestDispatchPlan(unittest.TestCase):
         self.assertEqual([d["index"] for d in plan["dispatches"]], list(range(1, 9)))
 
     def test_single_agent_plan_omits_the_index_suffix(self):
-        plan = dispatch.dispatch_plan("balanced", "BL4", self.dir, "/repo")
+        plan = dispatch.dispatch_plan("balanced", "probe", self.dir, "/repo")
         self.assertEqual(plan["kind"], "agent")
         self.assertTrue(plan["dispatches"][0]["result_path"].endswith("kavach-probe.json"))
 
     def test_core_plan_has_nothing_to_dispatch(self):
-        plan = dispatch.dispatch_plan("balanced", "BL6c", self.dir, "/repo")
+        plan = dispatch.dispatch_plan("balanced", "render", self.dir, "/repo")
         self.assertEqual(plan["kind"], "core")
         self.assertEqual(plan["dispatches"], [])
         self.assertEqual(plan["executor"], "core:render")
 
     def test_sequential_rosters_are_flagged(self):
-        self.assertTrue(dispatch.dispatch_plan("deep", "DP2", self.dir, "/repo")["sequential"])
-        self.assertFalse(dispatch.dispatch_plan("deep", "DP4", self.dir, "/repo")["sequential"])
+        self.assertTrue(dispatch.dispatch_plan("deep", "history", self.dir, "/repo")["sequential"])
+        self.assertFalse(dispatch.dispatch_plan("deep", "hunt", self.dir, "/repo")["sequential"])
 
     def test_gate_paths_are_absolute(self):
-        plan = dispatch.dispatch_plan("balanced", "BL2", self.dir, "/repo")
+        plan = dispatch.dispatch_plan("balanced", "kb", self.dir, "/repo")
         self.assertTrue(all(os.path.isabs(g) for g in plan["gate"]))
 
 
@@ -198,12 +199,12 @@ class TestSlicing(unittest.TestCase):
 
     def test_written_slice_declares_what_it_left_out(self):
         """A hunter that thinks its slice is the whole set reports coverage it does not have."""
-        result = slicing.write_slice(self.dir, "BL3", "kavach-supply", index=6)
+        result = slicing.write_slice(self.dir, "hunt", "kavach-supply", index=6)
         self.assertEqual((result["included"], result["excluded"], result["total"]), (1, 3, 4))
         with open(result["path"], encoding="utf-8") as fh:
             payload = json.load(fh)
         self.assertIn("3 belong to other domains", payload["note"])
-        self.assertTrue(result["path"].endswith(os.path.join("bl3", "slices", "kavach-supply-6.json")))
+        self.assertTrue(result["path"].endswith(os.path.join("hunt", "slices", "kavach-supply-6.json")))
 
     def test_merged_source_aliases_still_slice(self):
         """merge_findings prefixes sources with a per-audit alias, so a whole-string match
@@ -250,7 +251,7 @@ class TestPaths(unittest.TestCase):
 class TestAgentAuthoredResults(unittest.TestCase):
     """A subagent hand-writes its result file, so the contract has to survive a model.
 
-    Two failures cost a whole LT2 dispatch before these existed: `finding-schema.md`'s own
+    Two failures cost a whole `hunt` dispatch before these existed: `finding-schema.md`'s own
     example omitted `source`, which `Finding` requires, so no agent following the documented
     contract could produce an ingestible file; and one invented key raised, which quarantined
     the file and lost the six findings beside it.
@@ -258,10 +259,10 @@ class TestAgentAuthoredResults(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        os.makedirs(os.path.join(self.dir, "runs", "lt2"))
+        os.makedirs(os.path.join(self.dir, "runs", "hunt"))
 
     def _result(self, name, findings):
-        path = os.path.join(self.dir, "runs", "lt2", name)
+        path = os.path.join(self.dir, "runs", "hunt", name)
         with open(path, "w", encoding="utf-8") as fh:
             json.dump({"domain": "sast", "controls": {}, "findings": findings}, fh)
         return path
@@ -280,24 +281,24 @@ class TestAgentAuthoredResults(unittest.TestCase):
         path = self._result("kavach-sast.json", [
             {"title": "Hardcoded key", "severity": "critical", "category": "A07:Secrets",
              "locations": [{"file": "server.js", "line": 7}]}])
-        written, _ = dispatch.ingest(self.dir, "LT2", path)
+        written, _ = dispatch.ingest(self.dir, "hunt", path)
         self.assertEqual(written, 1)
         drafts = os.listdir(os.path.join(self.dir, "findings-draft"))
         self.assertEqual(len(drafts), 1)
 
     def test_a_status_result_with_no_findings_is_not_corrupt(self):
-        """BL4's probe writes a protocol status object, not a findings envelope. Quarantining
+        """`probe` writes a protocol status object, not a findings envelope. Quarantining
         it left the phase re-planning a dispatch that had already done its work."""
-        path = os.path.join(self.dir, "runs", "lt2", "kavach-probe.json")
+        path = os.path.join(self.dir, "runs", "hunt", "kavach-probe.json")
         with open(path, "w", encoding="utf-8") as fh:
             json.dump({"agent": "kavach-probe", "status": "complete", "loops": 2}, fh)
-        written, skipped = dispatch.ingest(self.dir, "LT2", path)
+        written, skipped = dispatch.ingest(self.dir, "hunt", path)
         self.assertEqual((written, skipped), (0, 0))
 
     def test_attribution_survives_a_fan_out_index(self):
-        self.assertEqual(dispatch.agent_from_result("/a/runs/bl3/kavach-sast-3.json"),
+        self.assertEqual(dispatch.agent_from_result("/a/runs/hunt/kavach-sast-3.json"),
                          "kavach-sast")
-        self.assertEqual(dispatch.agent_from_result("/a/runs/lt2/kavach-sast.json"),
+        self.assertEqual(dispatch.agent_from_result("/a/runs/hunt/kavach-sast.json"),
                          "kavach-sast")
 
     def test_an_unattributed_finding_stays_promotable(self):

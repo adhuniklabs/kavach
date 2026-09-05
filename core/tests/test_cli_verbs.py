@@ -126,7 +126,7 @@ class TestMergeVerb(unittest.TestCase):
         self.assertEqual(merged[0].source, "kavach-api")
 
     def test_survives_a_result_that_is_a_status_object(self):
-        # BL4's probe and BL5's chamber answer with {agent, status, summary, outputs} and
+        # `probe` and `chamber` answer with {agent, status, summary, outputs} and
         # no `findings` key. The strict read raised KeyError there, which took every
         # sibling result down with it.
         status = self._result("kavach-probe.json", {
@@ -204,7 +204,7 @@ class TestCoverageVerb(unittest.TestCase):
         self.assertIn("C1", err)
         self.assertTrue(os.path.exists(
             os.path.join(self.dir, "attack-surface", "poc-coverage.json")))
-        self.assertFalse(runner.gate_satisfied(self.dir, "BL6"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "poc"))
 
     def test_aggregates_are_exempt_and_a_full_sweep_is_exit_0(self):
         for fdir in self.dirs:
@@ -217,7 +217,7 @@ class TestCoverageVerb(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertTrue(payload["complete"])
         self.assertEqual(payload["aggregates_exempt"], 2)
-        self.assertTrue(runner.gate_satisfied(self.dir, "BL6"))
+        self.assertTrue(runner.gate_satisfied(self.dir, "poc"))
 
 
 class TestBudgetVerb(unittest.TestCase):
@@ -248,7 +248,7 @@ class TestBudgetVerb(unittest.TestCase):
 
     def test_check_sheds_and_records_when_planned_exceeds_the_ceiling(self):
         self._run("state", "init", "--mode", "lite", "--budget", "4")
-        rc, payload, err = self._run("budget", "check", "--phase", "BL3", "--planned", "8")
+        rc, payload, err = self._run("budget", "check", "--phase", "hunt", "--planned", "8")
         self.assertEqual(rc, 7)
         self.assertEqual(json.loads(payload), {"allowed": 4, "dropped": 4,
                                               "reason": budget.DISPATCH_CEILING})
@@ -259,11 +259,11 @@ class TestBudgetVerb(unittest.TestCase):
 
     def test_check_within_budget_is_exit_0_and_charge_accounts(self):
         self._run("state", "init", "--mode", "lite", "--budget", "10")
-        self.assertEqual(self._run("budget", "check", "--phase", "BL3", "--planned", "6")[0], 0)
-        self.assertEqual(self._run("budget", "charge", "--phase", "BL3", "-n", "6")[0], 0)
+        self.assertEqual(self._run("budget", "check", "--phase", "hunt", "--planned", "6")[0], 0)
+        self.assertEqual(self._run("budget", "charge", "--phase", "hunt", "-n", "6")[0], 0)
         ledger = json.loads(self._run("budget", "show")[1])
         self.assertEqual((ledger["dispatches"], ledger["remaining"]), (6, 4))
-        self.assertEqual(ledger["by_phase"], {"BL3": 6})
+        self.assertEqual(ledger["by_phase"], {"hunt": 6})
 
     def test_check_and_charge_need_a_phase(self):
         self._run("state", "init", "--mode", "lite")
@@ -271,7 +271,7 @@ class TestBudgetVerb(unittest.TestCase):
         self.assertEqual(self._run("budget", "charge", "-n", "1")[0], 5)
 
     def test_budget_verbs_without_an_audit_are_a_tooling_error(self):
-        self.assertEqual(self._run("budget", "check", "--phase", "BL3", "--planned", "1")[0], 5)
+        self.assertEqual(self._run("budget", "check", "--phase", "hunt", "--planned", "1")[0], 5)
         self.assertEqual(self._run("budget", "show")[0], 0)
 
 
@@ -310,7 +310,7 @@ class TestRenderVerb(unittest.TestCase):
         path = os.path.join(self.reports, "final-audit-report.md")
         self.assertEqual(self._run("render", "--format", "md", "--output", path)[0], 0)
         self.assertTrue(os.path.exists(path))
-        self.assertTrue(runner.gate_satisfied(self.dir, "BL6c"))
+        self.assertTrue(runner.gate_satisfied(self.dir, "render"))
 
     def test_html_render_does_not_need_reportlab(self):
         rc, body, _ = self._run("render", "--format", "html")
@@ -340,13 +340,13 @@ class TestRenderVerb(unittest.TestCase):
         coverage gaps. That list is the honesty property of the whole redesign."""
         run = state.init_audit(self.dir, "lite", modes.phases_for("lite"))
         budget.init_budget(self.dir, run.audit_id, "lite", max_dispatches=2)
-        budget.check(self.dir, run.audit_id, "LT3", 9)
+        budget.check(self.dir, run.audit_id, "poc", 9)
         consolidate(self.dir, _mixed_findings())
         coverage.write_coverage(self.dir, "poc")
 
         body = self._run("render", "--format", "md")[1]
         limits = body.split("### 2.3 Limits of this run")[1].split("## 3.")[0]
-        self.assertIn("Phase LT3: 7 of 9 planned subagent dispatches were dropped", limits)
+        self.assertIn("Phase poc: 7 of 9 planned subagent dispatches were dropped", limits)
         self.assertIn("dispatch ceiling", limits)
         self.assertIn("have no proof of concept", limits)
         self.assertIn("C1", limits)
@@ -464,7 +464,7 @@ class TestScanNoLongerWritesTheRetiredReport(unittest.TestCase):
 
     def test_scan_never_pre_satisfies_the_report_gate(self):
         self._scan()
-        self.assertFalse(runner.gate_satisfied(self.dir, "BL6c"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "render"))
 
 
 class TestIssuesVerb(unittest.TestCase):
@@ -552,31 +552,31 @@ class TestEngineSeamFlags(unittest.TestCase):
         return buf.getvalue()
 
     def test_index_gives_each_fan_out_dispatch_its_own_result_path(self):
-        """Without --index the eight BL3/DP4 hunters are all told to write one file."""
-        paths = {self._prompt("DP4", "--agent", "kavach-sast", "--index", str(i))
+        """Without --index the eight hunters are all told to write one file."""
+        paths = {self._prompt("hunt", "--agent", "kavach-sast", "--index", str(i))
                  .split("audit root):\n")[1].splitlines()[0].strip()
                  for i in range(1, 9)}
         self.assertEqual(len(paths), 8)
 
     def test_agent_overrides_the_phases_default_executor(self):
-        body = self._prompt("DP4", "--agent", "kavach-billing")
+        body = self._prompt("hunt", "--agent", "kavach-billing")
         self.assertIn("kavach-billing.json", body)
 
     def test_ingest_folds_every_result_of_a_phase_when_no_result_is_named(self):
         from kavach import dispatch
         for i in (1, 2):
-            path = dispatch.result_path(self.dir, "DP4", "kavach-sast", index=i)
+            path = dispatch.result_path(self.dir, "hunt", "kavach-sast", index=i)
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump({"findings": [_finding(f"F{i}").to_dict()]}, fh)
         buf = io.StringIO()
         with redirect_stderr(buf):
-            rc = main(["ingest", "DP4", "--out", self.dir])
+            rc = main(["ingest", "hunt", "--out", self.dir])
         self.assertEqual(rc, 0)
         self.assertIn("2 draft(s) from 2 result file(s)", buf.getvalue())
 
     def test_ingest_with_nothing_on_disk_is_a_tooling_error(self):
         with redirect_stderr(io.StringIO()):
-            self.assertEqual(main(["ingest", "DP4", "--out", self.dir]), 5)
+            self.assertEqual(main(["ingest", "hunt", "--out", self.dir]), 5)
 
     def test_report_finding_on_an_aggregate_is_a_no_op_not_an_error(self):
         findings = _mixed_findings()
@@ -605,20 +605,20 @@ class TestReportsDeliverableMove(unittest.TestCase):
     def test_every_report_gate_points_under_reports(self):
         gates = {p: g for p, g in modes.PHASE_GATES.items()
                  if any(n in g[0] for n in ("final-audit-report", "confirmation-report"))}
-        self.assertEqual(set(gates), {"BL6c", "DP15", "DP16", "CF6"})
+        self.assertEqual(set(gates), {"render", "certify"})
         for phase, gate in gates.items():
             self.assertTrue(gate[0].startswith("reports/"), f"{phase}: {gate}")
 
     def test_the_new_path_satisfies_every_report_gate(self):
         self._write("reports/final-audit-report.md")
         self._write("reports/confirmation-report.md")
-        for phase in ("BL6c", "DP15", "DP16", "CF6"):
+        for phase in ("render", "certify"):
             self.assertTrue(runner.gate_satisfied(self.dir, phase), phase)
 
     def test_a_pre_0_3_audit_root_report_still_gates_complete(self):
         self._write("final-audit-report.md")
         self._write("confirmation-report.md")
-        for phase in ("BL6c", "DP15", "DP16", "CF6"):
+        for phase in ("render", "certify"):
             self.assertTrue(runner.gate_satisfied(self.dir, phase), phase)
 
     def test_the_size_rule_still_applies_at_either_path(self):
@@ -627,7 +627,7 @@ class TestReportsDeliverableMove(unittest.TestCase):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("truncated")
-        self.assertFalse(runner.gate_satisfied(self.dir, "BL6c"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "render"))
 
 
 if __name__ == "__main__":
@@ -649,26 +649,30 @@ class TestHarnessVerbs(unittest.TestCase):
 
     def test_plan_json_carries_the_whole_dispatch_plan(self):
         state.init_audit(self.dir, "balanced", modes.phases_for("balanced"))
+        # recon leads every preset and is a core phase with nothing to dispatch, so its
+        # gate is closed here to reach a phase that actually carries a roster.
+        with open(os.path.join(self.dir, "recon.json"), "w", encoding="utf-8") as fh:
+            fh.write("{}")
         code, out = self._run("plan", "--out", self.dir, "--mode", "balanced", "--json")
         self.assertEqual(code, 0)
         plan = json.loads(out)
         self.assertEqual(plan["mode"], "balanced")
-        first = plan["actionable"][0]
-        self.assertEqual(first["phase"], "BL1")
-        self.assertEqual(first["dispatches"][0]["agent"], "kavach-intel")
+        first = next(p for p in plan["actionable"] if p["kind"] == "agent")
+        self.assertEqual(first["phase"], "intent")
+        self.assertEqual(first["dispatches"][0]["agent"], "kavach-intent")
 
     def test_plan_without_json_still_prints_bare_phase_ids(self):
         state.init_audit(self.dir, "balanced", modes.phases_for("balanced"))
         code, out = self._run("plan", "--out", self.dir, "--mode", "balanced")
-        self.assertEqual((code, out.strip()), (0, "BL1"))
+        self.assertEqual((code, out.strip()), (0, "recon"))
 
     def test_phase_prompt_is_dispatchable_without_reading_skill_md(self):
-        code, out = self._run("phase-prompt", "BL3", "--out", self.dir, "--mode", "balanced",
+        code, out = self._run("phase-prompt", "hunt", "--out", self.dir, "--mode", "balanced",
                               "--target", ".", "--agent", "kavach-sast", "--index", "1")
         self.assertEqual(code, 0)
         self.assertIn("## Your task", out)
         self.assertIn("## Read these first", out)
-        self.assertIn(os.path.join("runs", "bl3", "kavach-sast-1.json"), out)
+        self.assertIn(os.path.join("runs", "hunt", "kavach-sast-1.json"), out)
 
     def test_agents_json_lists_the_roster_with_tiers(self):
         code, out = self._run("agents", "--out", self.dir, "--json")
@@ -680,16 +684,16 @@ class TestHarnessVerbs(unittest.TestCase):
 
     def test_slice_writes_one_agents_leads(self):
         dump_findings(_mixed_findings(), os.path.join(self.dir, "findings.json"))
-        code, out = self._run("slice", "BL3", "--out", self.dir, "--agent", "kavach-supply",
+        code, out = self._run("slice", "hunt", "--out", self.dir, "--agent", "kavach-supply",
                               "--index", "6")
         self.assertEqual(code, 0)
         result = json.loads(out)
         self.assertEqual(result["included"], 2)     # the two trivy CVEs
         self.assertEqual(result["excluded"], 5)
 
-    def test_inventory_writes_the_gate_cf7_does_not_delete(self):
-        """CF1's gate used to be written into confirm-workspace/, which CF7's own cleanup
-        removes - so the phase after it deleted the gate of the phase before it."""
+    def test_inventory_writes_the_gate_cleanup_does_not_delete(self):
+        """`inventory`'s gate used to be written into confirm-workspace/, which the
+        `cleanup` phase removes - so a later phase deleted the gate of an earlier one."""
         consolidate(self.dir, _mixed_findings())
         code, _ = self._run("inventory", "--out", self.dir)
         self.assertEqual(code, 0)
@@ -703,7 +707,7 @@ class TestHarnessVerbs(unittest.TestCase):
     def test_budget_charge_records_spend_and_events_show_it(self):
         run = state.init_audit(self.dir, "balanced", modes.phases_for("balanced"))
         budget.init_budget(self.dir, run.audit_id, "balanced")
-        code, _ = self._run("budget", "charge", "--out", self.dir, "--phase", "BL3", "-n", "6",
+        code, _ = self._run("budget", "charge", "--out", self.dir, "--phase", "hunt", "-n", "6",
                             "--tokens-in", "1200", "--tokens-out", "300", "--cost-usd", "0.42")
         self.assertEqual(code, 0)
         _, shown = self._run("budget", "show", "--out", self.dir)

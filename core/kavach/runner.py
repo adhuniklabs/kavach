@@ -52,14 +52,14 @@ def gate_satisfied(audit_dir: str, phase: str) -> bool:
     return True
 
 
-def fanout_pending(audit_dir: str, phase: str) -> list[str]:
+def fanout_pending(audit_dir: str, phase: str, mode: str) -> list[str]:
     """Roster members of a fan-out phase that have no result on disk.
 
-    A gate artifact is not proof a fan-out finished. Every hunter on BL3 is handed the
+    A gate artifact is not proof a fan-out finished. Every hunter on `hunt` is handed the
     same assigned output path, so the first one home closes the phase for the other
     seven. A harness can keep its own roster ledger while it runs, but that ledger dies
     with the process: measured on a resumed audit where four hunters had failed
-    upstream, `plan` never offered BL3 again and the run advanced to BL4 reporting
+    upstream, `plan` never offered `hunt` again and the run advanced to `probe` reporting
     itself complete, permanently missing half its static analysis.
 
     Deliberately consulted by `next_actionable` and not by `phase_status`, so an
@@ -67,7 +67,7 @@ def fanout_pending(audit_dir: str, phase: str) -> list[str]:
     A hunter that can never succeed would otherwise wedge the whole audit, and this
     engine reports rather than blocks — `coverage` is where the shortfall belongs.
     """
-    roster = modes.roster_for(phase)
+    roster = modes.roster_for(phase, mode)
     if len(roster) < 2:
         return []
     return [
@@ -90,19 +90,19 @@ def _done(status: str) -> bool:
     return status in (PhaseStatus.COMPLETE.value, PhaseStatus.SKIPPED.value)
 
 
-def next_actionable(audit_dir: str, mode: str) -> list[str]:
+def next_actionable(audit_dir: str, mode: str, live: bool = False) -> list[str]:
     out = []
-    for phase in modes.phases_for(mode):
-        if gate_satisfied(audit_dir, phase) and not fanout_pending(audit_dir, phase):
+    for phase in modes.phases_for(mode, live):
+        if gate_satisfied(audit_dir, phase) and not fanout_pending(audit_dir, phase, mode):
             continue
-        prereqs = modes.prereqs_for(mode, phase)
+        prereqs = modes.prereqs_for(mode, phase, live)
         if all(_done(phase_status(audit_dir, mode, p)) for p in prereqs):
             out.append(phase)
     return out
 
 
-def ensure_prereqs(audit_dir: str, mode: str, phase: str) -> None:
-    for p in modes.prereqs_for(mode, phase):
+def ensure_prereqs(audit_dir: str, mode: str, phase: str, live: bool = False) -> None:
+    for p in modes.prereqs_for(mode, phase, live):
         if not _done(phase_status(audit_dir, mode, p)):
             raise PrereqError(f"{phase} needs {p} complete first")
 

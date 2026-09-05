@@ -220,21 +220,21 @@ class TestLimits(unittest.TestCase):
         self._write("audit-state.json", {"audits": [{
             "audit_id": "a1", "mode": "deep",
             "budget": {"max_dispatches": 120, "dispatches": 120,
-                       "shed": [{"phase": "DP13", "planned": 40, "allowed": 22,
+                       "shed": [{"phase": "poc", "planned": 40, "allowed": 22,
                                  "dropped": 18, "reason": "dispatch ceiling"}]},
         }]})
         limits = build(meta={"audit_dir": self.dir}).limits
-        self.assertTrue(any("DP13" in x and "18 of 40" in x for x in limits), limits)
+        self.assertTrue(any("poc" in x and "18 of 40" in x for x in limits), limits)
 
     def test_budget_shed_can_be_scoped_to_one_audit(self):
         self._write("audit-state.json", {"audits": [
-            {"audit_id": "old", "budget": {"shed": [{"phase": "BL6", "planned": 5,
+            {"audit_id": "old", "budget": {"shed": [{"phase": "hunt", "planned": 5,
                                                      "dropped": 5, "reason": "wall clock"}]}},
-            {"audit_id": "new", "budget": {"shed": [{"phase": "DP13", "planned": 9,
+            {"audit_id": "new", "budget": {"shed": [{"phase": "poc", "planned": 9,
                                                      "dropped": 2, "reason": "ceiling"}]}},
         ]})
-        self.assertEqual([r["phase"] for r in model.budget_shed(self.dir, "new")], ["DP13"])
-        self.assertEqual([r["phase"] for r in model.budget_shed(self.dir)], ["BL6", "DP13"])
+        self.assertEqual([r["phase"] for r in model.budget_shed(self.dir, "new")], ["poc"])
+        self.assertEqual([r["phase"] for r in model.budget_shed(self.dir)], ["hunt", "poc"])
 
     def test_coverage_missing_reaches_limits(self):
         self._write("attack-surface/poc-coverage.json", {
@@ -266,7 +266,7 @@ class TestLimits(unittest.TestCase):
     def test_every_limit_reaches_the_markdown_and_html_deliverables(self):
         self._write("audit-state.json", {"audits": [{
             "audit_id": "a1",
-            "budget": {"shed": [{"phase": "DP13", "planned": 40, "dropped": 18,
+            "budget": {"shed": [{"phase": "poc", "planned": 40, "dropped": 18,
                                  "reason": "dispatch ceiling"}]}}]})
         findings = fixture_findings()
         gate = run_gate(findings, None, require_controls=True)

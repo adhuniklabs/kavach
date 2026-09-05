@@ -18,13 +18,13 @@ class TestBalancedEngineDryRun(unittest.TestCase):
         from kavach.finding import Finding, Location, Severity
 
         d = tempfile.mkdtemp()
-        state.init_audit(d, "balanced", ["BL1", "BL2", "BL6c", "BL7"], repository="o/r")
-        self.assertEqual(runner.next_actionable(d, "balanced")[0], "BL1")
+        state.init_audit(d, "balanced", ["intel", "kb", "render", "cleanup"], repository="o/r")
+        self.assertEqual(runner.next_actionable(d, "balanced")[0], "recon")
 
-        # simulate BL1..BL2 producing their gate artifacts
+        # simulate intel and kb producing their gate artifacts
         kb.write_section(d, "advisory-summary.md", "Advisories", "none")
         kb.write_section(d, "knowledge-base-report.md", "Architecture Model", "single service")
-        self.assertNotIn("BL1", runner.next_actionable(d, "balanced"))
+        self.assertNotIn("intel", runner.next_actionable(d, "balanced"))
 
         # consolidate a finding + write the final report gate artifact
         findings_tree.consolidate(d, [Finding(
@@ -32,7 +32,7 @@ class TestBalancedEngineDryRun(unittest.TestCase):
             locations=[Location(file="a.py", line=1)])])
         with open(os.path.join(d, "final-audit-report.md"), "w") as fh:
             fh.write("KAVACH final report\n" + "x" * 600)
-        self.assertTrue(runner.gate_satisfied(d, "BL6c"))
+        self.assertTrue(runner.gate_satisfied(d, "render"))
 
         cleanup.cleanup(d, "balanced")
         self.assertTrue(os.path.isdir(os.path.join(d, "findings")))

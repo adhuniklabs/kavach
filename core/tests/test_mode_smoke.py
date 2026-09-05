@@ -25,11 +25,25 @@ def _satisfy_per_finding_work(audit_dir, promoted):
         report_finding.write_report(fdir, _stub_finding())
 
 
+def _json_artifact(audit_dir, name, payload):
+    """The attack-surface/ half kb.write_section does not cover: a JSON gate artifact."""
+    d = os.path.join(audit_dir, "attack-surface")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, name), "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+
+
 def _stub_finding(title="SQLi in find_user"):
     return Finding(title=title, severity=Severity.CRITICAL, category="A03:Injection",
                    source="kavach-sast", locations=[Location(file="app.py", line=10)],
                    what_it_is="x" * 200, how_exploited="x" * 200,
                    business_impact="x" * 200, remediation="x" * 200)
+
+
+def _stub_sweep(audit_dir):
+    dump_findings([], os.path.join(audit_dir, "findings.json"))
+    with open(os.path.join(audit_dir, "sweep-summary.json"), "w", encoding="utf-8") as fh:
+        json.dump({"scanners_run": [], "unavailable": [], "total_findings": 0}, fh)
 
 
 class TestLiteModeSmoke(unittest.TestCase):
@@ -38,40 +52,47 @@ class TestLiteModeSmoke(unittest.TestCase):
 
     def test_lite_mode_plan_ingest_consolidate_cleanup(self):
         state.init_audit(self.dir, "lite", modes.phases_for("lite"), repository="o/r")
-        self.assertEqual(runner.next_actionable(self.dir, "lite")[0], "LT0")
+        self.assertEqual(runner.next_actionable(self.dir, "lite")[0], "recon")
 
-        # LT0 core:recon - pure-Python, safe to run for real
+        # recon core:recon - pure-Python, safe to run for real
         recon, files = run_recon(FIXTURE)
         with open(os.path.join(self.dir, "recon.json"), "w", encoding="utf-8") as fh:
             json.dump(recon, fh)
         with open(os.path.join(self.dir, "file-manifest.txt"), "w", encoding="utf-8") as fh:
             fh.write("\n".join(files))
-        self.assertNotIn("LT0", runner.next_actionable(self.dir, "lite"))
+        self.assertNotIn("recon", runner.next_actionable(self.dir, "lite"))
 
-        # LT1 core:sweep - stubbed summary, no docker/network dependency in a smoke test
-        dump_findings([], os.path.join(self.dir, "findings.json"))
-        with open(os.path.join(self.dir, "sweep-summary.json"), "w", encoding="utf-8") as fh:
-            json.dump({"scanners_run": [], "unavailable": [], "total_findings": 0}, fh)
-        self.assertNotIn("LT1", runner.next_actionable(self.dir, "lite"))
+        # sweep core:sweep - stubbed summary, no docker/network dependency in a smoke test
+        _stub_sweep(self.dir)
+        self.assertNotIn("sweep", runner.next_actionable(self.dir, "lite"))
 
-        # LT2 kavach-sast - stubbed subagent output, ingested through the real engine seam
+        # hunt kavach-sast - stubbed subagent output, ingested through the real engine seam.
+        # lite's roster is the single agent that owns the gate, so the artifact closes it.
         stub = _stub_finding()
         agent_json = os.path.join(self.dir, "agent-sast.json")
         dump_findings([stub], agent_json)
-        dispatch.ingest(self.dir, "LT2", agent_json)
-        kb.write_section(self.dir, "lite-q2-summary.md", "Lite Q2 Summary", "Stubbed SAST pass.")
-        self.assertNotIn("LT2", runner.next_actionable(self.dir, "lite"))
+        dispatch.ingest(self.dir, "hunt", agent_json)
+        kb.write_section(self.dir, "source-sink-flows-all-severities.md", "Source-Sink Flows",
+                         "Stubbed SAST pass.")
+        self.assertNotIn("hunt", runner.next_actionable(self.dir, "lite"))
 
-        # LT3 kavach-poc + consolidate - promotes the stub finding, then the PoC coverage
+        # poc kavach-poc + consolidate - promotes the stub finding, then the PoC coverage
         # artifact proves the per-finding work actually happened
         promoted = findings_tree.consolidate(self.dir, [stub])
         coverage.write_coverage(self.dir, "poc")
-        self.assertIn("LT3", runner.next_actionable(self.dir, "lite"))   # promoted, no PoC yet
+        self.assertIn("poc", runner.next_actionable(self.dir, "lite"))   # promoted, no PoC yet
         _satisfy_per_finding_work(self.dir, promoted)
         coverage.write_coverage(self.dir, "poc")
-        self.assertNotIn("LT3", runner.next_actionable(self.dir, "lite"))
+        self.assertNotIn("poc", runner.next_actionable(self.dir, "lite"))
 
-        # LT4 core:cleanup
+        # render core:render - the deterministic pass lite used to stop one step short of
+        os.makedirs(os.path.join(self.dir, "reports"), exist_ok=True)
+        with open(os.path.join(self.dir, "reports", "final-audit-report.md"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("# KAVACH Final Audit Report\n\n" + "x" * 600)
+        self.assertNotIn("render", runner.next_actionable(self.dir, "lite"))
+
+        # cleanup core:cleanup
         cleanup.cleanup(self.dir, "lite")
         self.assertEqual(runner.next_actionable(self.dir, "lite"), [])
         self.assertTrue(os.path.isdir(os.path.join(self.dir, "findings")))
@@ -85,51 +106,60 @@ class TestBalancedModeSmoke(unittest.TestCase):
 
     def test_balanced_mode_plan_ingest_consolidate_cleanup(self):
         state.init_audit(self.dir, "balanced", modes.phases_for("balanced"), repository="o/r")
-        self.assertEqual(runner.next_actionable(self.dir, "balanced")[0], "BL1")
+        self.assertEqual(runner.next_actionable(self.dir, "balanced")[0], "recon")
 
         recon, _ = run_recon(FIXTURE)
         with open(os.path.join(self.dir, "recon.json"), "w", encoding="utf-8") as fh:
             json.dump(recon, fh)
+        self.assertNotIn("recon", runner.next_actionable(self.dir, "balanced"))
+
+        _stub_sweep(self.dir)
+        self.assertNotIn("sweep", runner.next_actionable(self.dir, "balanced"))
+
+        _json_artifact(self.dir, "intent-corpus.json", {"behaviors": [], "risks": []})
+        self.assertNotIn("intent", runner.next_actionable(self.dir, "balanced"))
 
         kb.write_section(self.dir, "advisory-summary.md", "Advisories", "stubbed - none found")
-        self.assertNotIn("BL1", runner.next_actionable(self.dir, "balanced"))
+        self.assertNotIn("intel", runner.next_actionable(self.dir, "balanced"))
 
         kb.write_section(self.dir, "knowledge-base-report.md", "Architecture Model", "single service")
-        self.assertNotIn("BL2", runner.next_actionable(self.dir, "balanced"))
+        self.assertNotIn("kb", runner.next_actionable(self.dir, "balanced"))
 
         stub = _stub_finding()
         agent_json = os.path.join(self.dir, "agent-sast.json")
         dump_findings([stub], agent_json)
-        dispatch.ingest(self.dir, "BL3", agent_json)
+        dispatch.ingest(self.dir, "hunt", agent_json)
         kb.write_section(self.dir, "source-sink-flows-all-severities.md", "Source-Sink Flows", "Stubbed.")
-        # BL3 fans out to eight hunters that share one gate artifact, so the artifact
-        # alone no longer closes it — every hunter needs a result. See
+        # balanced fans hunt out to eight hunters that share one gate artifact, so the
+        # artifact alone no longer closes it — every hunter needs a result. See
         # runner.fanout_pending.
-        self.assertIn("BL3", runner.next_actionable(self.dir, "balanced"))
-        for i, name in enumerate(modes.roster_for("BL3"), start=1):
-            dump_findings([stub], dispatch.result_path(self.dir, "BL3", name, index=i))
-        self.assertNotIn("BL3", runner.next_actionable(self.dir, "balanced"))
+        self.assertIn("hunt", runner.next_actionable(self.dir, "balanced"))
+        for i, name in enumerate(modes.roster_for("hunt", "balanced"), start=1):
+            dump_findings([stub], dispatch.result_path(self.dir, "hunt", name, index=i))
+        self.assertNotIn("hunt", runner.next_actionable(self.dir, "balanced"))
 
-        kb.write_section(self.dir, "manual-attack-surface-inventory.md", "Manual Attack Surface",
-                         "Stubbed.")
-        self.assertNotIn("BL4", runner.next_actionable(self.dir, "balanced"))
+        kb.write_section(self.dir, "deep-probe-summary.md", "Manual Attack Surface", "Stubbed.")
+        self.assertNotIn("probe", runner.next_actionable(self.dir, "balanced"))
 
-        kb.write_section(self.dir, "balanced-chamber-summary.md", "Chamber Summary",
+        kb.write_section(self.dir, "deep-chamber-summary.md", "Chamber Summary",
                          "Stubbed - no false positives found.")
-        self.assertNotIn("BL5", runner.next_actionable(self.dir, "balanced"))
+        self.assertNotIn("chamber", runner.next_actionable(self.dir, "balanced"))
 
-        # BL6/BL6b (PoC + report drafting) each gate on their own coverage artifact, so
+        _json_artifact(self.dir, "confirm-intent-crosscheck.json", {"findings": []})
+        self.assertNotIn("crosscheck", runner.next_actionable(self.dir, "balanced"))
+
+        # poc/report (PoC + report drafting) each gate on their own coverage artifact, so
         # promotion alone no longer closes them
         promoted = findings_tree.consolidate(self.dir, [stub])
         _satisfy_per_finding_work(self.dir, promoted)
         coverage.write_coverage(self.dir, "poc")
         coverage.write_coverage(self.dir, "report")
-        self.assertNotIn("BL6", runner.next_actionable(self.dir, "balanced"))
-        self.assertNotIn("BL6b", runner.next_actionable(self.dir, "balanced"))
+        self.assertNotIn("poc", runner.next_actionable(self.dir, "balanced"))
+        self.assertNotIn("report", runner.next_actionable(self.dir, "balanced"))
 
         with open(os.path.join(self.dir, "final-audit-report.md"), "w", encoding="utf-8") as fh:
             fh.write("# KAVACH Final Audit Report\n\n" + "x" * 600)
-        self.assertNotIn("BL6c", runner.next_actionable(self.dir, "balanced"))
+        self.assertNotIn("render", runner.next_actionable(self.dir, "balanced"))
 
         cleanup.cleanup(self.dir, "balanced")
         self.assertEqual(runner.next_actionable(self.dir, "balanced"), [])
@@ -153,18 +183,18 @@ class TestOtherModesPlanAndGatesWire(unittest.TestCase):
                 self.assertTrue(modes.gate_for(phase), f"{mode}/{phase} missing gate")
 
 
-class TestCF7GateSurvivesCleanup(unittest.TestCase):
-    """CF7's gate used to be confirm-workspace/cleanup-summary.json - a file its own
-    core:cleanup step deletes and never wrote in the first place, so confirm mode could
-    not finish. The durable artifact cleanup() already writes is the honest gate.
+class TestCleanupGateSurvivesCleanup(unittest.TestCase):
+    """The cleanup gate used to be confirm-workspace/cleanup-summary.json - a file its own
+    core:cleanup step deletes and never wrote in the first place, so confirm mode could not
+    finish. The durable artifact cleanup() already writes is the honest gate, and the one
+    `cleanup` phase the three presets share now carries it."""
 
-    CF1-CF7 are orphaned since the mode collapse deleted `confirm` from MODE_PHASES (Task 3
-    re-keys them into the --live tail), so this is asserted directly against the registry
-    rather than by driving a mode through state/runner."""
-
-    def test_cf7_gates_on_a_durable_artifact_cleanup_writes(self):
-        root = posixpath.normpath(modes.gate_for("CF7")[0]).split("/")[0]
+    def test_cleanup_gates_on_a_durable_artifact_cleanup_writes(self):
+        root = posixpath.normpath(modes.gate_for("cleanup")[0]).split("/")[0]
         self.assertNotIn(root, cleanup.TRANSIENT)
+        d = tempfile.mkdtemp()
+        cleanup.cleanup(d, "lite")
+        self.assertTrue(runner.gate_satisfied(d, "cleanup"))
 
 
 if __name__ == "__main__":

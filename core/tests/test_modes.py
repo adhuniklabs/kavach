@@ -8,58 +8,89 @@ class TestModes(unittest.TestCase):
     def test_three_modes(self):
         self.assertEqual(set(modes.MODES), {"lite", "balanced", "deep"})
 
-    def test_removed_modes_are_gone(self):
-        for name in ("diff", "confirm", "revisit", "merge", "longshot"):
-            with self.assertRaises(KeyError, msg=name):
-                modes.phases_for(name)
+    def test_presets_nest(self):
+        lite = set(modes.phases_for("lite"))
+        balanced = set(modes.phases_for("balanced"))
+        deep = set(modes.phases_for("deep"))
+        self.assertLess(lite, balanced)
+        self.assertLess(balanced, deep)
 
-    def test_balanced_phase_order(self):
-        self.assertEqual(
-            modes.phases_for("balanced"),
-            ["BL1", "BL2", "BL3", "BL4", "BL5", "BL6", "BL6b", "BL6c", "BL7"],
-        )
+    def test_preset_sizes(self):
+        self.assertEqual(len(modes.phases_for("lite")), 6)
+        self.assertEqual(len(modes.phases_for("balanced")), 13)
+        self.assertEqual(len(modes.phases_for("deep")), 20)
 
-    def test_deep_has_seventeen_phases(self):
-        self.assertEqual(len(modes.phases_for("deep")), 17)
-        self.assertEqual(modes.phases_for("deep")[0], "DP1")
-        self.assertEqual(modes.phases_for("deep")[-1], "DP17")
+    def test_phases_come_back_in_pipeline_order(self):
+        for mode in modes.MODES:
+            got = modes.phases_for(mode)
+            self.assertEqual(got, [p for p in modes.PIPELINE if p in got], mode)
 
-    def test_deep_prereq_dag(self):
-        self.assertEqual(modes.prereqs_for("deep", "DP4"), ["DP3"])
-        self.assertEqual(set(modes.prereqs_for("deep", "DP10")),
-                         {"DP5", "DP6", "DP7", "DP8", "DP9"})
-        self.assertEqual(modes.prereqs_for("deep", "DP1"), [])
+    def test_lite_renders_a_report(self):
+        self.assertIn("render", modes.phases_for("lite"))
+        self.assertNotIn("report", modes.phases_for("lite"))
+
+    def test_every_preset_schedules_recon_and_sweep_for_itself(self):
+        """The invariant that retired missing_prerequisites(). `recon` writes recon.json and
+        `sweep` is the only verb that writes findings.json; `scope` ranks the manifest and
+        `slice`, `triage` and `render` all read findings.json. balanced scheduled neither,
+        and driving it sent eight hunters empty slices and then died in the report tail."""
+        for mode in modes.MODES:
+            self.assertLessEqual({"recon", "sweep"}, set(modes.phases_for(mode)), mode)
+
+    def test_induced_prereqs_stay_inside_the_preset(self):
+        for mode in modes.MODES:
+            members = set(modes.phases_for(mode))
+            for phase in members:
+                for prereq in modes.prereqs_for(mode, phase):
+                    self.assertIn(prereq, members, f"{mode}/{phase} -> {prereq}")
+
+    def test_dropped_phases_reroute_through_their_own_prereqs(self):
+        # poc declares crosscheck, which lite drops; resolution walks crosscheck ->
+        # variant -> verify -> chamber and keeps only what lite actually runs.
+        self.assertEqual(set(modes.prereqs_for("lite", "poc")), {"recon", "hunt"})
+        self.assertEqual(set(modes.prereqs_for("balanced", "crosscheck")),
+                         {"intent", "chamber"})
+
+    def test_deep_keeps_the_full_dag(self):
+        self.assertEqual(modes.prereqs_for("deep", "verify"), ["chamber"])
+        self.assertEqual(modes.prereqs_for("deep", "recon"), [])
+
+    def test_hunt_roster_is_preset_dependent(self):
+        self.assertEqual(modes.roster_for("hunt", "lite"), ["kavach-sast"])
+        self.assertEqual(len(modes.roster_for("hunt", "deep")), 8)
+        self.assertEqual(len(modes.roster_for("hunt", "balanced")), 8)
 
     def test_every_phase_has_label_and_agent(self):
-        for mode in modes.MODES:
-            for phase in modes.phases_for(mode):
-                self.assertIn(phase, modes.PHASE_LABELS, f"{phase} missing label")
-                self.assertIn(phase, modes.PHASE_AGENT, f"{phase} missing agent")
+        for phase in modes.PIPELINE:
+            self.assertIn(phase, modes.PHASE_LABELS, f"{phase} missing label")
+            self.assertIn(phase, modes.PHASE_AGENT, f"{phase} missing agent")
 
     def test_gate_globs_are_lists(self):
-        self.assertIsInstance(modes.gate_for("BL6c"), list)
-        self.assertTrue(any("final-audit-report" in g for g in modes.gate_for("BL6c")))
-
-    def test_no_gate_under_transient(self):
-        """The invariant whose absence let DP10/DP11 gate on tmp/: a gate that cleanup
-        deletes makes its phase eligible again on every resume, so the run pays for the
-        same fan-out twice."""
-        for mode in modes.MODES:
-            for phase in modes.phases_for(mode):
-                for pat in modes.gate_for(phase):
-                    root = posixpath.normpath(pat).split("/")[0]
-                    self.assertNotIn(root, cleanup.TRANSIENT,
-                                     f"{mode}/{phase} gates on transient {pat!r}")
+        self.assertIsInstance(modes.gate_for("render"), list)
+        self.assertTrue(any("final-audit-report" in g for g in modes.gate_for("render")))
 
     def test_per_finding_phases_gate_on_coverage_not_on_the_directory(self):
-        for phase in ("LT3", "BL6", "DP13"):
-            self.assertEqual(modes.gate_for(phase), ["attack-surface/poc-coverage.json"], phase)
-        for phase in ("BL6b", "DP14"):
-            self.assertEqual(modes.gate_for(phase), ["attack-surface/report-coverage.json"], phase)
+        self.assertEqual(modes.gate_for("poc"), ["attack-surface/poc-coverage.json"])
+        self.assertEqual(modes.gate_for("report"), ["attack-surface/report-coverage.json"])
+
+    def test_no_gate_under_transient(self):
+        """The invariant whose absence let chamber and verify gate on tmp/: a gate that
+        cleanup deletes makes its phase eligible again on every resume, which is how a run
+        pays for the same fan-out twice."""
+        for phase in modes.PIPELINE:
+            for pat in modes.gate_for(phase):
+                root = posixpath.normpath(pat).split("/")[0]
+                self.assertNotIn(root, cleanup.TRANSIENT,
+                                 f"{phase} gates on transient {pat!r}")
 
     def test_unknown_mode_raises(self):
         with self.assertRaises(KeyError):
             modes.phases_for("nope")
+
+    def test_removed_modes_are_gone(self):
+        for name in ("diff", "confirm", "revisit", "merge", "longshot"):
+            with self.assertRaises(KeyError, msg=name):
+                modes.phases_for(name)
 
 
 if __name__ == "__main__":

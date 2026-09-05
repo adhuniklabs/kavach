@@ -152,9 +152,9 @@ def cmd_merge(args) -> int:
     for extra in args.extra or []:
         # An `--extra` is a sub-agent result, so it gets the read written for one:
         # attributed to the dispatch that wrote it, and tolerant of a missing `findings`
-        # key. BL4's probe and BL5's chamber answer with a status object, and the strict
-        # read raised KeyError on them — which is why nothing merged agent findings at
-        # all. `findings.json` keeps the strict read; a missing key *there* is our bug.
+        # key. `probe` and `chamber` answer with a status object, and the strict read
+        # raised KeyError on them — which is why nothing merged agent findings at all.
+        # `findings.json` keeps the strict read; a missing key *there* is our bug.
         findings.extend(dispatch.load_agent_findings(extra))
     from .sweep import dedupe
     merged = dedupe(findings)
@@ -429,7 +429,7 @@ def cmd_state(args) -> int:
     if args.state_cmd == "init":
         from . import budget as budget_mod, gitinfo
         git = gitinfo.context(args.target)
-        run = state.init_audit(out, args.mode, modes.phases_for(args.mode),
+        run = state.init_audit(out, args.mode, modes.phases_for(args.mode, args.live),
                                repository=getattr(args, "repository", "") or "",
                                commit=git.commit, branch=git.branch, dirty=git.dirty)
         ledger = budget_mod.init_budget(out, run.audit_id, args.mode,
@@ -494,10 +494,10 @@ def _snapshot_findings_baseline(out: str, commit: str | None) -> str | None:
 
 
 def cmd_plan(args) -> int:
-    from . import dispatch, modes, runner
+    from . import dispatch, runner
     _check_mode(args.mode)
     out = _out_dir(args)
-    phases = runner.next_actionable(out, args.mode)
+    phases = runner.next_actionable(out, args.mode, args.live)
     if not args.json:
         for phase in phases:
             print(phase)
@@ -506,11 +506,6 @@ def cmd_plan(args) -> int:
         "mode": args.mode,
         "audit_dir": out,
         "target": os.path.abspath(args.target),
-        # The deterministic passes this mode does not schedule and does not have. Empty for
-        # `lite`, which opens with core:recon and core:sweep; two entries for a fresh
-        # `balanced`, whose phase list is all agent phases and whose hunters, slices and
-        # report tail all read what recon and sweep write.
-        "prerequisites": modes.missing_prerequisites(out, args.mode),
         "actionable": [dispatch.dispatch_plan(args.mode, p, out, args.target) for p in phases],
     }, indent=2))
     return 0
@@ -581,8 +576,9 @@ def cmd_events(args) -> int:
 
 
 def cmd_inventory(args) -> int:
-    """CF1. Was 'enumerate findings/ yourself' in SKILL.md, so every harness wrote the
-    same loop - and wrote it to confirm-workspace/, which CF7 then deletes."""
+    """The `inventory` phase. Was 'enumerate findings/ yourself' in SKILL.md, so every
+    harness wrote the same loop - and wrote it to confirm-workspace/, which `cleanup`
+    then deletes."""
     out = _out_dir(args)
     entries = []
     for path in sorted(glob.glob(os.path.join(out, "findings", "*"))):
@@ -986,6 +982,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--commit", default=None,
                     help="commit to record on complete (else git rev-parse HEAD)")
     sp.add_argument("--target", default=".", help="target repo root, for the git context")
+    sp.add_argument("--live", action="store_true",
+                    help="include the live-validation tail (sandboxed PoC execution)")
     sp.set_defaults(func=cmd_state)
 
     sp = sub.add_parser("plan", help="print next-actionable phases for a mode")
@@ -994,6 +992,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="emit the whole dispatch plan - roster, indices, result paths, "
                          "references, gate - instead of bare phase ids")
     sp.add_argument("--target", default=".", help="target repo root, for --json")
+    sp.add_argument("--live", action="store_true",
+                    help="include the live-validation tail (sandboxed PoC execution)")
     sp.set_defaults(func=cmd_plan)
 
     sp = sub.add_parser("agents", help="the agent roster as data: tools, model, tier")
@@ -1021,7 +1021,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--since", type=int, default=0, help="skip the first N lines")
     sp.set_defaults(func=cmd_events)
 
-    sp = sub.add_parser("inventory", help="CF1: index findings/ into the confirm inventory")
+    sp = sub.add_parser("inventory", help="index findings/ into the confirm inventory")
     add_common(sp); sp.set_defaults(func=cmd_inventory)
 
     sp = sub.add_parser("phase-prompt", help="emit the composed sub-agent prompt for a phase")
@@ -1033,6 +1033,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--index", type=int, default=None,
                     help="1-based index within a fan-out. REQUIRED when a phase dispatches "
                          "more than one agent, or every dispatch is told to write one path")
+    sp.add_argument("--live", action="store_true",
+                    help="include the live-validation tail (sandboxed PoC execution)")
     sp.set_defaults(func=cmd_phase_prompt)
 
     sp = sub.add_parser("ingest", help="fold a sub-agent result into drafts")
@@ -1050,6 +1052,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("cleanup", help="remove transient artifacts for a mode")
     add_common(sp); sp.add_argument("--mode", required=True)
+    sp.add_argument("--live", action="store_true",
+                    help="include the live-validation tail (sandboxed PoC execution)")
     sp.set_defaults(func=cmd_cleanup)
 
     sp = sub.add_parser("diff", help="resolve prior commit, scope changed files, drift diff")

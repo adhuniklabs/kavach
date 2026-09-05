@@ -26,13 +26,13 @@ class TestCliEngine(unittest.TestCase):
         with redirect_stdout(buf):
             rc = main(["plan", "--mode", "balanced", "--out", self.dir])
         self.assertEqual(rc, 0)
-        self.assertEqual(buf.getvalue().strip().splitlines()[0], "BL1")
+        self.assertEqual(buf.getvalue().strip().splitlines()[0], "recon")
 
     def test_phase_prompt_emits_header(self):
         main(["state", "init", "--mode", "balanced", "--out", self.dir])
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = main(["phase-prompt", "BL2", "--mode", "balanced",
+            rc = main(["phase-prompt", "kb", "--mode", "balanced",
                        "--target", ".", "--out", self.dir])
         self.assertEqual(rc, 0)
         self.assertIn("Architecture & Threat Model", buf.getvalue())
@@ -258,7 +258,7 @@ class TestMalformedJsonIsToolingError(unittest.TestCase):
 class TestCmdRenderWithoutRecon(unittest.TestCase):
     """balanced/deep can reach a report phase in an audit dir that never had a core:recon
     pass of its own - render must still produce a report, not crash with FileNotFoundError
-    (which would leave BL6c/DP15's gate unsatisfiable forever)."""
+    (which would leave `render`'s gate unsatisfiable forever)."""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -305,7 +305,7 @@ class TestCmdResume(unittest.TestCase):
         self.assertIn("nothing to resume", buf.getvalue())
 
     def test_resumes_latest_in_progress(self):
-        state.init_audit(self.dir, "balanced", ["BL1", "BL2"], repository="o/r")
+        state.init_audit(self.dir, "balanced", ["recon", "sweep"], repository="o/r")
         buf = io.StringIO()
         with redirect_stdout(buf):
             rc = main(["resume", "--out", self.dir])
@@ -315,7 +315,7 @@ class TestCmdResume(unittest.TestCase):
         # `read -r MODE PHASES < <(K resume ...)` reads only the first line, so a prefix
         # there means MODE ends up as the literal string "mode:".
         self.assertEqual(lines[0], "balanced")
-        self.assertIn("BL1", lines)
+        self.assertIn("recon", lines)
 
     def test_resume_line_one_is_bare_mode_after_state_init(self):
         main(["state", "init", "--out", self.dir, "--mode", "lite"])

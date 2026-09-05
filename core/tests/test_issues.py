@@ -92,7 +92,7 @@ def _audit(audit_dir):
         json.dump({"meta": {"phase": "merge"}, "findings": rows}, fh, indent=2)
     with open(os.path.join(audit_dir, "recon.json"), "w", encoding="utf-8") as fh:
         json.dump({"root": "/repo/target"}, fh)
-    state.init_audit(audit_dir, "balanced", ["BL1"], commit="deadbeef")
+    state.init_audit(audit_dir, "balanced", ["intel"], commit="deadbeef")
 
     _promote(audit_dir, "C1", findings[0])
     _promote(audit_dir, "C2", findings[1])
