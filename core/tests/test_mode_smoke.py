@@ -4,6 +4,7 @@ model calls) and proves each mode plans -> ingests -> consolidates -> gates -> c
 
 import json
 import os
+import posixpath
 import tempfile
 import unittest
 
@@ -150,6 +151,20 @@ class TestOtherModesPlanAndGatesWire(unittest.TestCase):
             self.assertEqual(actionable[0], phases[0], mode)
             for phase in phases:
                 self.assertTrue(modes.gate_for(phase), f"{mode}/{phase} missing gate")
+
+
+class TestCF7GateSurvivesCleanup(unittest.TestCase):
+    """CF7's gate used to be confirm-workspace/cleanup-summary.json - a file its own
+    core:cleanup step deletes and never wrote in the first place, so confirm mode could
+    not finish. The durable artifact cleanup() already writes is the honest gate.
+
+    CF1-CF7 are orphaned since the mode collapse deleted `confirm` from MODE_PHASES (Task 3
+    re-keys them into the --live tail), so this is asserted directly against the registry
+    rather than by driving a mode through state/runner."""
+
+    def test_cf7_gates_on_a_durable_artifact_cleanup_writes(self):
+        root = posixpath.normpath(modes.gate_for("CF7")[0]).split("/")[0]
+        self.assertNotIn(root, cleanup.TRANSIENT)
 
 
 if __name__ == "__main__":

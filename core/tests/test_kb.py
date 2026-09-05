@@ -1,7 +1,5 @@
-import json
 import os
 import tempfile
-import threading
 import unittest
 
 from kavach import kb
@@ -28,26 +26,6 @@ class TestKB(unittest.TestCase):
             body = fh.read()
         self.assertIn("Bypass the billing wall", body)
         self.assertIn("EXPLOITABLE", body)
-
-    def test_update_target_status_atomic(self):
-        sidecar = os.path.join(self.dir, "attack-surface", "longshot-targets.json")
-        os.makedirs(os.path.dirname(sidecar), exist_ok=True)
-        targets = [{"id": f"t{i}", "status": "pending"} for i in range(10)]
-        json.dump({"targets": targets}, open(sidecar, "w"))
-
-        threads = [
-            threading.Thread(target=kb.update_target_status, args=(self.dir, f"t{i}", "complete"))
-            for i in range(10)
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        got = json.load(open(sidecar))
-        statuses = {t["id"]: t["status"] for t in got["targets"]}
-        self.assertEqual(len(statuses), 10)
-        self.assertTrue(all(s == "complete" for s in statuses.values()))
 
 
 if __name__ == "__main__":

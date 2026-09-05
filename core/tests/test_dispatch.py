@@ -43,8 +43,8 @@ class TestDispatch(unittest.TestCase):
         self.assertTrue(a.endswith(os.path.join("dp4", "kavach-sast-1.json")))
 
     def test_result_path_slugs_agent_and_phase(self):
-        p = dispatch.result_path(self.dir, "RV10k", "core:render")
-        self.assertEqual(p, os.path.join(self.dir, "runs", "rv10k", "core-render.json"))
+        p = dispatch.result_path(self.dir, "BL6c", "core:render")
+        self.assertEqual(p, os.path.join(self.dir, "runs", "bl6c", "core-render.json"))
 
     def test_result_path_cannot_escape_the_runs_dir(self):
         p = dispatch.result_path(self.dir, "../..", "../../../etc/passwd")
@@ -68,9 +68,9 @@ class TestDispatch(unittest.TestCase):
         self.assertIn(f"\n  {expected}\n", h)
 
     def test_runtime_header_honours_explicit_agent_and_index(self):
-        h = dispatch.build_runtime_header("longshot", "LS2", self.dir, "/repo", [],
-                                          agent="kavach-longshot-hunter", index=7)
-        self.assertIn(os.path.join("runs", "ls2", "kavach-longshot-hunter-7.json"), h)
+        h = dispatch.build_runtime_header("balanced", "BL3", self.dir, "/repo", [],
+                                          agent="kavach-billing", index=7)
+        self.assertIn(os.path.join("runs", "bl3", "kavach-billing-7.json"), h)
 
     def test_runtime_header_omits_result_line_for_core_phases(self):
         h = dispatch.build_runtime_header("deep", "DP17", self.dir, "/repo", [])

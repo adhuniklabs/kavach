@@ -57,11 +57,11 @@ class TestLayout(unittest.TestCase):
         self.assertEqual(glob.glob(dispatch.result_glob(self.dir, "DP4")), [named])
 
     def test_fanout_results_share_one_phase_dir(self):
-        paths = [dispatch.result_path(self.dir, "LS2", "kavach-longshot-hunter", index=i)
+        paths = [dispatch.result_path(self.dir, "BL3", "kavach-billing", index=i)
                  for i in range(1, 9)]
         for p in paths:
             self._stub(p)
-        self.assertEqual(sorted(glob.glob(dispatch.result_glob(self.dir, "LS2"))),
+        self.assertEqual(sorted(glob.glob(dispatch.result_glob(self.dir, "BL3"))),
                          sorted(paths))
 
     def test_result_glob_does_not_leak_across_phases(self):

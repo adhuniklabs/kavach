@@ -705,10 +705,10 @@ def cmd_diff(args) -> int:
 
 
 def _write_diff_scope(out: str, prior: str, files: list[str], in_scope: bool) -> str:
-    """Pre-phase change-scoping artifact, written before DF1 exists. Deliberately not
-    diff-summary.md - that path is DF1's own gate (PHASE_GATES["DF1"]), produced by the
-    kavach-sast dispatch; writing it here would pre-satisfy the gate and DF1 would never
-    be dispatched."""
+    """The `kavach diff` verb's own scope report. Deliberately not diff-summary.md - the
+    mode collapse deleted the DF1 phase that name belonged to, but history (and the docs)
+    still associate it with a scan gate, so a different name avoids reviving that
+    expectation."""
     d = os.path.join(out, "attack-surface")
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "diff-scope.md")

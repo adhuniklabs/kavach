@@ -9,7 +9,6 @@ from .retry import read_positive_int_env
 FLAG_ENV: dict[str, str] = {
     "max_agents": "KAVACH_MAX_AGENTS",
     "phase_max_retries": "KAVACH_PHASE_MAX_RETRIES",
-    "longshot_limit": "KAVACH_LONGSHOT_LIMIT",
     "budget": "KAVACH_MAX_DISPATCHES",
     "max_wall_seconds": "KAVACH_MAX_WALL_SECONDS",
     "max_cost_usd": "KAVACH_MAX_COST_USD",

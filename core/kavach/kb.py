@@ -5,11 +5,7 @@ Adapted from piolium (github.com/vigolium/piolium) - MIT License, © j3ssie.
 
 from __future__ import annotations
 
-import json
 import os
-import uuid
-
-from filelock import FileLock
 
 
 def _as_dir(audit_dir: str) -> str:
@@ -37,17 +33,3 @@ def write_kill_chains(audit_dir: str, chains: list[dict]) -> str:
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
     return path
-
-
-def update_target_status(audit_dir: str, target_id: str, status: str) -> None:
-    path = os.path.join(_as_dir(audit_dir), "longshot-targets.json")
-    with FileLock(f"{path}.lock"):
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
-        for t in data.get("targets", []):
-            if t.get("id") == target_id:
-                t["status"] = status
-        tmp = f"{path}.tmp-{uuid.uuid4().hex}"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
-        os.replace(tmp, path)

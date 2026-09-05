@@ -70,9 +70,9 @@ class TestCmdDiff(unittest.TestCase):
         self.assertIn("b.py", body)
         self.assertIn("IN SCOPE", body)
 
-        # diff-summary.md is DF1's own gate (PHASE_GATES["DF1"]), produced by the DF1 scan
-        # (kavach-sast), not by `K diff`'s pre-phase scoping - writing it here would
-        # pre-satisfy the gate and DF1 would never be dispatched.
+        # diff-summary.md named the DF1 scan gate the mode collapse deleted from the
+        # registry; `kavach diff` writes its own scope report under a different name so
+        # it doesn't revive that expectation.
         summary = os.path.join(self.out, "attack-surface", "diff-summary.md")
         self.assertFalse(os.path.exists(summary))
 
@@ -256,10 +256,9 @@ class TestMalformedJsonIsToolingError(unittest.TestCase):
 
 
 class TestCmdRenderWithoutRecon(unittest.TestCase):
-    """merge/longshot/revisit can reach a report phase in an audit dir that never had a
-    core:recon pass of its own - render must still produce a report, not crash with
-    FileNotFoundError (which would leave BL6c/DP15/RV11c/LS3/MG7's gate unsatisfiable
-    forever)."""
+    """balanced/deep can reach a report phase in an audit dir that never had a core:recon
+    pass of its own - render must still produce a report, not crash with FileNotFoundError
+    (which would leave BL6c/DP15's gate unsatisfiable forever)."""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()

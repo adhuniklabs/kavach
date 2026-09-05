@@ -145,9 +145,9 @@ class TestModePrerequisites(unittest.TestCase):
     `recon` writes recon.json and file-manifest.txt; `sweep` is the only verb that writes
     findings.json. `scope` ranks the manifest and `slice`, `triage` and `render` all read
     findings.json - so a mode whose phase list schedules neither needs both run up front.
-    `lite` opens with core:recon and core:sweep. balanced, deep, diff, longshot and revisit
-    do not, and driving balanced without them sent eight hunters empty slices and then died
-    in the report tail.
+    `lite` opens with core:recon and core:sweep. balanced and deep do not, and driving
+    balanced without them sent eight hunters empty slices and then died in the report
+    tail.
     """
 
     def setUp(self):
