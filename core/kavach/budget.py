@@ -24,8 +24,7 @@ from typing import Any
 
 from . import flags, state
 
-DEFAULT_MAX_DISPATCHES = {"lite": 15, "balanced": 60, "deep": 120, "diff": 10,
-                          "confirm": 30, "revisit": 80, "merge": 20, "longshot": 40}
+DEFAULT_MAX_DISPATCHES = {"lite": 15, "balanced": 60, "deep": 120}
 DEFAULT_MAX_WALL_SECONDS = 3 * 3600
 
 UNLIMITED = "unlimited"

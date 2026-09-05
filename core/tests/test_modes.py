@@ -5,11 +5,13 @@ from kavach import cleanup, modes
 
 
 class TestModes(unittest.TestCase):
-    def test_eight_modes(self):
-        self.assertEqual(
-            set(modes.MODES),
-            {"lite", "balanced", "deep", "diff", "confirm", "revisit", "merge", "longshot"},
-        )
+    def test_three_modes(self):
+        self.assertEqual(set(modes.MODES), {"lite", "balanced", "deep"})
+
+    def test_removed_modes_are_gone(self):
+        for name in ("diff", "confirm", "revisit", "merge", "longshot"):
+            with self.assertRaises(KeyError, msg=name):
+                modes.phases_for(name)
 
     def test_balanced_phase_order(self):
         self.assertEqual(
@@ -50,15 +52,10 @@ class TestModes(unittest.TestCase):
                                      f"{mode}/{phase} gates on transient {pat!r}")
 
     def test_per_finding_phases_gate_on_coverage_not_on_the_directory(self):
-        for phase in ("LT3", "BL6", "DP13", "RV11"):
+        for phase in ("LT3", "BL6", "DP13"):
             self.assertEqual(modes.gate_for(phase), ["attack-surface/poc-coverage.json"], phase)
-        for phase in ("BL6b", "DP14", "RV11b"):
+        for phase in ("BL6b", "DP14"):
             self.assertEqual(modes.gate_for(phase), ["attack-surface/report-coverage.json"], phase)
-
-    def test_promotion_phases_keep_the_directory_gate(self):
-        # RV9/RV10/RV10k/MG6 promote; the directory existing is the honest gate for them
-        for phase in ("RV9", "RV10", "RV10k", "MG6"):
-            self.assertEqual(modes.gate_for(phase), ["findings"], phase)
 
     def test_unknown_mode_raises(self):
         with self.assertRaises(KeyError):

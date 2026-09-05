@@ -145,7 +145,7 @@ class TestAgentDefs(unittest.TestCase):
         roster = agentdefs.load_all()
         if not roster:
             self.skipTest("agents/ not installed beside the core")
-        self.assertEqual(len(roster), 40)
+        self.assertEqual(len(roster), 37)
         sast = roster["kavach-sast"]
         self.assertIn("Bash", sast.tools)
         self.assertEqual(sast.tier, agentdefs.REASONING)

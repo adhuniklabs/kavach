@@ -605,20 +605,20 @@ class TestReportsDeliverableMove(unittest.TestCase):
     def test_every_report_gate_points_under_reports(self):
         gates = {p: g for p, g in modes.PHASE_GATES.items()
                  if any(n in g[0] for n in ("final-audit-report", "confirmation-report"))}
-        self.assertEqual(set(gates), {"BL6c", "DP15", "DP16", "RV11c", "MG7", "CF6"})
+        self.assertEqual(set(gates), {"BL6c", "DP15", "DP16", "CF6"})
         for phase, gate in gates.items():
             self.assertTrue(gate[0].startswith("reports/"), f"{phase}: {gate}")
 
     def test_the_new_path_satisfies_every_report_gate(self):
         self._write("reports/final-audit-report.md")
         self._write("reports/confirmation-report.md")
-        for phase in ("BL6c", "DP15", "DP16", "RV11c", "MG7", "CF6"):
+        for phase in ("BL6c", "DP15", "DP16", "CF6"):
             self.assertTrue(runner.gate_satisfied(self.dir, phase), phase)
 
     def test_a_pre_0_3_audit_root_report_still_gates_complete(self):
         self._write("final-audit-report.md")
         self._write("confirmation-report.md")
-        for phase in ("BL6c", "DP15", "DP16", "RV11c", "MG7", "CF6"):
+        for phase in ("BL6c", "DP15", "DP16", "CF6"):
             self.assertTrue(runner.gate_satisfied(self.dir, phase), phase)
 
     def test_the_size_rule_still_applies_at_either_path(self):
@@ -700,21 +700,6 @@ class TestHarnessVerbs(unittest.TestCase):
         self.assertTrue(payload["count"])
         self.assertTrue(any(e["is_aggregate"] for e in payload["findings"]))
 
-    def test_enumerate_needs_recon_first_and_says_so(self):
-        code, _ = self._run("enumerate", "--out", self.dir)
-        self.assertEqual(code, 5)
-
-    def test_enumerate_filters_to_source_and_caps(self):
-        with open(os.path.join(self.dir, "file-manifest.txt"), "w", encoding="utf-8") as fh:
-            fh.write("\n".join(["a.py", "b.ts", "pnpm-lock.yaml", "c.go", "d.md"]))
-        code, _ = self._run("enumerate", "--out", self.dir, "--limit", "2")
-        self.assertEqual(code, 0)
-        with open(os.path.join(self.dir, "attack-surface", "longshot-targets.json"),
-                  encoding="utf-8") as fh:
-            targets = json.load(fh)["targets"]
-        self.assertEqual([t["path"] for t in targets], ["a.py", "b.ts"])
-        self.assertEqual(targets[0]["status"], "pending")
-
     def test_budget_charge_records_spend_and_events_show_it(self):
         run = state.init_audit(self.dir, "balanced", modes.phases_for("balanced"))
         budget.init_budget(self.dir, run.audit_id, "balanced")
@@ -741,3 +726,22 @@ class TestHarnessVerbs(unittest.TestCase):
         with open(os.path.join(self.dir, "attack-surface", "scope-kavach-billing.json"),
                   encoding="utf-8") as fh:
             self.assertEqual(json.load(fh)["files"][0]["path"], "src/billing/webhook.ts")
+
+
+class TestRemovedModeNames(unittest.TestCase):
+    def setUp(self):
+        self.audit = tempfile.mkdtemp()
+
+    def _run(self, *argv) -> tuple[int, str]:
+        buf, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(buf), redirect_stderr(err):
+            code = main([*argv])
+        return code, buf.getvalue() + err.getvalue()
+
+    def test_removed_mode_names_point_at_their_replacement(self):
+        for name, hint in (("diff", "kavach diff"), ("confirm", "--live"),
+                           ("revisit", "existing audit"), ("merge", "kavach merge-run"),
+                           ("longshot", "removed")):
+            code, out = self._run("plan", "--out", self.audit, "--mode", name)
+            self.assertNotEqual(code, 0, name)
+            self.assertIn(hint, out, name)

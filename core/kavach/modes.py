@@ -1,7 +1,7 @@
 """KAVACH mode/phase registry - the on-disk phase contract.
 
 Adapted from piolium (github.com/vigolium/piolium) - MIT License, © j3ssie.
-Phase ids are KAVACH-specific (LT/BL/DP/DF/CF/RV/MG/LS). Keep in sync with
+Phase ids are KAVACH-specific (LT/BL/DP/CF). Keep in sync with
 docs/phase-reference.md; nothing else in the tree may redeclare a phase id.
 """
 
@@ -13,11 +13,6 @@ MODE_PHASES: dict[str, list[str]] = {
     "lite": ["LT0", "LT1", "LT2", "LT3", "LT4"],
     "balanced": ["BL1", "BL2", "BL3", "BL4", "BL5", "BL6", "BL6b", "BL6c", "BL7"],
     "deep": [f"DP{i}" for i in range(1, 18)],
-    "diff": ["DF1"],
-    "confirm": ["CF1", "CF1_5", "CF2", "CF3", "CF4", "CF5", "CF6", "CF7"],
-    "revisit": ["RV0", "RV5", "RV7", "RV8", "RV9", "RV10", "RV10k", "RV11", "RV11b", "RV11c"],
-    "merge": ["MG1", "MG2", "MG3", "MG4", "MG5", "MG6", "MG7"],
-    "longshot": ["LS1", "LS2", "LS3"],
 }
 
 MODES: list[str] = list(MODE_PHASES.keys())
@@ -64,25 +59,11 @@ PHASE_LABELS: dict[str, str] = {
     "DP11": "False-Positive Verification", "DP12": "Variant Search",
     "DP13": "Proof-of-Concept Construction", "DP14": "Finding Report Drafting",
     "DP15": "Final Report Assembly", "DP16": "Finding Verification", "DP17": "Cleanup",
-    # diff
-    "DF1": "Changed-file Scan",
     # confirm
     "CF1": "Findings Inventory + Report Repair", "CF1_5": "Intent Cross-Check",
     "CF2": "Environment Discovery", "CF3": "Environment Provisioning",
     "CF4": "Proof-of-Concept Execution", "CF5": "Test-Based Fallback",
     "CF6": "Confirmation Report", "CF7": "Cleanup & Redaction",
-    # revisit
-    "RV0": "Intent Cartography", "RV5": "Fresh Deep Probe", "RV7": "SAST Reclassification",
-    "RV8": "Fresh Review Chambers", "RV9": "False-Positive Verification",
-    "RV10": "New Finding Variants", "RV10k": "Known Finding Variants",
-    "RV11": "Proof-of-Concept Construction", "RV11b": "Finding Report Drafting",
-    "RV11c": "Final Report Assembly",
-    # merge
-    "MG1": "Copy & Index", "MG2": "Semantic Deduplication", "MG3": "Metadata Auto-Fix",
-    "MG4": "Quarantine Unfixable", "MG5": "Severity Renumbering",
-    "MG6": "Apply Finding Renames", "MG7": "Final Report Assembly",
-    # longshot
-    "LS1": "Target Enumeration", "LS2": "Per-File Hail-Mary Hunt", "LS3": "Finding Aggregation",
 }
 
 # phase -> executor. "core:<fn>" = deterministic engine step; else = sub-agent name.
@@ -97,16 +78,9 @@ PHASE_AGENT: dict[str, str] = {
     "DP9": "kavach-crossservice", "DP10": "kavach-chamber", "DP11": "kavach-verifier",
     "DP12": "kavach-variant", "DP13": "kavach-poc", "DP14": "kavach-reporter",
     "DP15": "core:render", "DP16": "kavach-confirm-reporter", "DP17": "core:cleanup",
-    "DF1": "kavach-sast",
     "CF1": "core:inventory", "CF1_5": "kavach-intent-crosscheck", "CF2": "kavach-env-detective",
     "CF3": "kavach-env-provisioner", "CF4": "kavach-poc-executor", "CF5": "kavach-test-mapper",
     "CF6": "kavach-confirm-reporter", "CF7": "core:cleanup",
-    "RV0": "kavach-intent", "RV5": "kavach-probe", "RV7": "kavach-sast", "RV8": "kavach-chamber",
-    "RV9": "kavach-verifier", "RV10": "kavach-variant", "RV10k": "kavach-variant",
-    "RV11": "kavach-poc", "RV11b": "kavach-reporter", "RV11c": "core:render",
-    "MG1": "core:merge", "MG2": "kavach-chamber", "MG3": "core:merge", "MG4": "core:merge",
-    "MG5": "core:merge", "MG6": "core:merge", "MG7": "core:render",
-    "LS1": "core:enumerate", "LS2": "kavach-longshot-hunter", "LS3": "kavach-longshot-aggregator",
 }
 
 # phase -> required artifact globs (relative to the audit dir) that prove completion.
@@ -144,7 +118,6 @@ PHASE_GATES: dict[str, list[str]] = {
     "DP15": ["reports/final-audit-report.md"],
     "DP16": ["reports/confirmation-report.md"],
     "DP17": ["attack-surface/deep-cleanup-summary.json"],
-    "DF1": ["attack-surface/diff-summary.md"],
     "CF1": ["attack-surface/confirm-findings-inventory.json"],
     "CF1_5": ["attack-surface/confirm-intent-crosscheck.json"],
     "CF2": ["attack-surface/confirm-env-strategies.json"],
@@ -153,18 +126,6 @@ PHASE_GATES: dict[str, list[str]] = {
     "CF5": ["attack-surface/confirm-test-mapping.json"],
     "CF6": ["reports/confirmation-report.md"],
     "CF7": ["attack-surface/confirm-cleanup-summary.json"],
-    "RV0": ["attack-surface/intent-corpus.json"], "RV5": ["attack-surface/revisit-probe-summary.md"],
-    "RV7": ["attack-surface/revisit-r7-chamber-summary.md"], "RV8": ["attack-surface/revisit-r8-chamber-summary.md"],
-    "RV9": ["findings"], "RV10": ["findings"], "RV10k": ["findings"],
-    "RV11": ["attack-surface/poc-coverage.json"], "RV11b": ["attack-surface/report-coverage.json"],
-    "RV11c": ["reports/final-audit-report.md"],
-    "MG1": ["attack-surface/merge-index.json"], "MG2": ["attack-surface/merge-dedup-decisions.json"],
-    "MG3": ["attack-surface/merge-index.json"], "MG4": ["attack-surface/merge-index.json"],
-    "MG5": ["attack-surface/merge-rename-map.json"],
-    "MG6": ["findings"], "MG7": ["reports/final-audit-report.md"],
-    "LS1": ["attack-surface/longshot-targets.json"],
-    "LS2": ["attack-surface/longshot-hunt-summary.json"],
-    "LS3": ["attack-surface/longshot-summary.md"],
 }
 
 
@@ -187,11 +148,11 @@ def gate_for(phase: str) -> list[str]:
 # reads one of those: `scope` ranks the manifest, and `slice`, `triage` and `render` all
 # read findings.json.
 #
-# `lite` opens with `core:recon` and `core:sweep`, so it prepares itself. `balanced`, `deep`,
-# `longshot` and `revisit` list neither. SKILL.md tells an orchestrator to run recon up front
-# for the two modes it names, but the requirement is not special to them and it is not only
-# recon - a `balanced` run driven without a sweep sends every hunter an empty slice and then
-# fails in its report tail on a findings.json nothing wrote.
+# `lite` opens with `core:recon` and `core:sweep`, so it prepares itself. `balanced` and
+# `deep` list neither. SKILL.md tells an orchestrator to run recon up front for the two
+# modes it names, but the requirement is not special to them and it is not only recon - a
+# `balanced` run driven without a sweep sends every hunter an empty slice and then fails
+# in its report tail on a findings.json nothing wrote.
 #
 # Reported as data rather than left in prose, so a harness does not have to carry the list.
 PREREQ_ARTIFACTS: tuple[tuple[str, str, str], ...] = (
@@ -379,11 +340,6 @@ PHASE_SPECS: dict[str, PhaseSpec] = {
         "Aggregate every confirm_status verdict this run produced into the confirmation "
         "report. The nine states are orthogonal metadata, never a second severity axis.",
         references=("certification.md",)),
-    # diff
-    "DF1": PhaseSpec(
-        _SCAN_TASK + " Scope yourself to the changed files named in "
-        "attack-surface/diff-scope.md - nothing outside that set is in scope for this run.",
-        inputs=("attack-surface/diff-scope.md",), roster=("kavach-sast",)),
     # confirm
     "CF1_5": PhaseSpec(
         "Compare each draft finding against the intent corpus and emit match / partial / no "
@@ -407,34 +363,6 @@ PHASE_SPECS: dict[str, PhaseSpec] = {
         "Aggregate every confirm_status verdict this run produced into the confirmation "
         "report. The nine states are orthogonal metadata, never a second severity axis.",
         references=("certification.md",)),
-    # revisit
-    "RV0": PhaseSpec(
-        "Mine repo-local security documentation into a cited corpus of behaviors this project "
-        "declares intentional and risks it explicitly acknowledges."),
-    "RV5": PhaseSpec(
-        "Probe the target fresh, with the known findings held out, so this pass can only "
-        "surface what the prior audit missed.",
-        references=("probe-protocol.md",)),
-    "RV7": PhaseSpec(_SCAN_TASK, roster=("kavach-sast",)),
-    "RV8": PhaseSpec(_CHAMBER_TASK),
-    "RV9": PhaseSpec(_VERIFY_TASK),
-    "RV10": PhaseSpec(_VARIANT_TASK),
-    "RV10k": PhaseSpec(_VARIANT_TASK + " These are the findings already known from the prior "
-                       "audit - you are checking whether each has spread, not re-proving it."),
-    "RV11": PhaseSpec(_POC_TASK),
-    "RV11b": PhaseSpec(_REPORT_TASK),
-    # merge
-    "MG2": PhaseSpec(
-        "Collapse semantic near-duplicates across the source finding sets and record every "
-        "dedup decision. Two findings with the same root cause at the same location are one."),
-    # longshot
-    "LS2": PhaseSpec(
-        "Anchor on the single source file you were given, follow its imports and callers "
-        "across the repo, and produce evidence-anchored drafts with strict path:line "
-        "citations. A no-finding marker is a valid, expected result."),
-    "LS3": PhaseSpec(
-        "Read every per-anchor draft the swarm produced, deduplicate by root cause, rank by "
-        "severity and confidence, and report honestly what you dropped and why."),
 }
 
 

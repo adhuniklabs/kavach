@@ -136,36 +136,13 @@ class TestBalancedModeSmoke(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.dir, "tmp")))
 
 
-class TestConfirmModeGatesSurviveCleanup(unittest.TestCase):
-    """CF7's gate used to be confirm-workspace/cleanup-summary.json - a file its own
-    core:cleanup step deletes and never wrote in the first place, so confirm mode could
-    not finish. The durable artifact cleanup() already writes is the honest gate."""
-
-    def setUp(self):
-        self.dir = tempfile.mkdtemp()
-
-    def test_cleanup_satisfies_cf7_and_does_not_reopen_earlier_phases(self):
-        state.init_audit(self.dir, "confirm", modes.phases_for("confirm"), repository="o/r")
-        for phase in ("CF1", "CF1_5", "CF2", "CF3", "CF4", "CF5"):
-            for rel in modes.gate_for(phase):
-                path = os.path.join(self.dir, rel)
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w", encoding="utf-8") as fh:
-                    json.dump({"phase": phase}, fh)
-        with open(os.path.join(self.dir, "confirmation-report.md"), "w", encoding="utf-8") as fh:
-            fh.write("# Confirmation Report\n\n" + "x" * 600)
-
-        self.assertEqual(runner.next_actionable(self.dir, "confirm"), ["CF7"])
-        cleanup.cleanup(self.dir, "confirm")
-        self.assertEqual(runner.next_actionable(self.dir, "confirm"), [])
-
-
 class TestOtherModesPlanAndGatesWire(unittest.TestCase):
     """Lighter smoke for the remaining modes - no stubbing, just proves the plan loop
-    resolves a first phase and every phase in the mode has a wired gate."""
+    resolves a first phase and every phase in the mode has a wired gate. lite/balanced
+    get the full stubbed walk above; deep is the only mode left without one."""
 
     def test_every_other_mode_plans_first_phase_and_has_gates(self):
-        for mode in ("deep", "diff", "confirm", "revisit", "merge", "longshot"):
+        for mode in ("deep",):
             d = tempfile.mkdtemp()
             phases = modes.phases_for(mode)
             state.init_audit(d, mode, phases, repository="o/r")

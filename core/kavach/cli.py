@@ -37,12 +37,23 @@ from .score import exit_code, gate as run_gate
 from .sweep import run_sweep
 
 
-# What longshot mode considers an anchor worth a hail-mary hunt. Deliberately source-only:
-# a swarm pointed at lockfiles and fixtures spends its whole budget before reaching code.
-SOURCE_EXTENSIONS = (
-    ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rb", ".php", ".java", ".kt", ".cs",
-    ".rs", ".swift", ".scala", ".c", ".cc", ".cpp", ".h", ".hpp", ".vue", ".svelte",
-)
+# Removed modes, and where their capability went. A bare "unknown mode" would leave an
+# operator with a muscle-memory command and no idea what replaced it.
+REMOVED_MODES = {
+    "diff": "use the `kavach diff` verb to scope a changed-file run",
+    "confirm": "use --live on any mode",
+    "revisit": "re-run any mode against the existing audit dir",
+    "merge": "use the `kavach merge-run` verb",
+    "longshot": "removed",
+}
+
+
+def _check_mode(mode: str) -> None:
+    from . import modes
+    if mode in REMOVED_MODES:
+        raise SystemExit(f"KAVACH: mode '{mode}' was removed - {REMOVED_MODES[mode]}")
+    if mode and mode not in modes.MODES:
+        raise SystemExit(f"KAVACH: unknown mode '{mode}' - choose one of {', '.join(modes.MODES)}")
 
 
 def _log(msg: str) -> None:
@@ -72,9 +83,9 @@ def _audit_id(out: str) -> str | None:
 
 
 def _empty_recon() -> dict:
-    """Safe stand-in for render() when recon.json was never written - merge/longshot/
-    revisit can reach a report phase without a core:recon pass in their own audit dir.
-    Every renderer reads recon fields via .get() with its own fallback, so an empty stack
+    """Safe stand-in for render() when recon.json was never written - balanced and deep
+    can reach a report phase without a core:recon pass in their own audit dir. Every
+    renderer reads recon fields via .get() with its own fallback, so an empty stack
     fingerprint here just means an honest "unknown stack" report, not a crash."""
     return {
         "root": "", "totals": {"files": 0, "code_files": 0, "by_language": {}, "by_extension": {}},
@@ -413,6 +424,7 @@ def cmd_corpus(args) -> int:
 
 def cmd_state(args) -> int:
     from . import modes, state
+    _check_mode(args.mode)
     out = _out_dir(args)
     if args.state_cmd == "init":
         from . import budget as budget_mod, gitinfo
@@ -483,6 +495,7 @@ def _snapshot_findings_baseline(out: str, commit: str | None) -> str | None:
 
 def cmd_plan(args) -> int:
     from . import dispatch, modes, runner
+    _check_mode(args.mode)
     out = _out_dir(args)
     phases = runner.next_actionable(out, args.mode)
     if not args.json:
@@ -505,6 +518,7 @@ def cmd_plan(args) -> int:
 
 def cmd_phase_prompt(args) -> int:
     from . import dispatch
+    _check_mode(args.mode)
     out = _out_dir(args)
     print(dispatch.phase_prompt(args.mode, args.phase, out, args.target,
                                 agent=args.agent, index=args.index))
@@ -594,30 +608,6 @@ def cmd_inventory(args) -> int:
     return 0
 
 
-def cmd_enumerate(args) -> int:
-    """LS1. Same story as inventory: SKILL.md said 'list the source files yourself'."""
-    from . import flags as flags_mod
-    out = _out_dir(args)
-    manifest = os.path.join(out, "file-manifest.txt")
-    if not os.path.exists(manifest):
-        _log("KAVACH enumerate → no file-manifest.txt; run `kavach recon` first")
-        return 5
-    with open(manifest, encoding="utf-8") as fh:
-        files = [line.strip() for line in fh if line.strip()]
-    exts = tuple(args.ext.split(",")) if args.ext else SOURCE_EXTENSIONS
-    targets = [f for f in files if f.endswith(exts)]
-    limit = flags_mod.read_positive_int_env("KAVACH_LONGSHOT_LIMIT", args.limit)
-    if limit and len(targets) > limit:
-        _log(f"  {len(targets)} source file(s) capped to {limit} (KAVACH_LONGSHOT_LIMIT)")
-        targets = targets[:limit]
-    dest = _write_text(
-        os.path.join(out, "attack-surface", "longshot-targets.json"),
-        json.dumps({"targets": [{"id": i, "path": p, "status": "pending"}
-                                for i, p in enumerate(targets, start=1)]}, indent=2))
-    _log(f"KAVACH enumerate → {len(targets)} target(s) → {os.path.relpath(dest, out)}")
-    return 0
-
-
 def cmd_ingest(args) -> int:
     from . import dispatch
     out = _out_dir(args)
@@ -676,6 +666,7 @@ def cmd_consolidate(args) -> int:
 
 def cmd_cleanup(args) -> int:
     from .cleanup import cleanup
+    _check_mode(args.mode)
     out = _out_dir(args)
     s = cleanup(out, args.mode)
     _log(f"KAVACH cleanup → removed {len(s['removed'])}, retained {len(s['retained'])}")
@@ -1033,12 +1024,6 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("inventory", help="CF1: index findings/ into the confirm inventory")
     add_common(sp); sp.set_defaults(func=cmd_inventory)
 
-    sp = sub.add_parser("enumerate", help="LS1: source files worth a hail-mary hunt")
-    add_common(sp)
-    sp.add_argument("--ext", default=None, help="comma-separated extensions to override the default set")
-    sp.add_argument("--limit", type=int, default=200, help="cap the target list (KAVACH_LONGSHOT_LIMIT)")
-    sp.set_defaults(func=cmd_enumerate)
-
     sp = sub.add_parser("phase-prompt", help="emit the composed sub-agent prompt for a phase")
     sp.add_argument("phase"); add_common(sp)
     sp.add_argument("--mode", required=True); sp.add_argument("--target", default=".")
@@ -1117,6 +1102,9 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(args)
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         _log(f"error: {exc}")
+        return 5
+    except SystemExit as exc:
+        _log(str(exc))
         return 5
     except KeyboardInterrupt:
         _mark_interrupted(args)

@@ -118,7 +118,7 @@ class TestCmdDiff(unittest.TestCase):
         dump_findings(baseline, os.path.join(self.out, "findings.json"))
 
         # a prior run completed at `first` and snapshotted the baseline
-        main(["state", "init", "--mode", "diff", "--out", self.out])
+        main(["state", "init", "--mode", "lite", "--out", self.out])
         main(["state", "complete", "--out", self.out, "--commit", self.first])
         baseline_path = os.path.join(self.out, "attack-surface",
                                      f"findings-baseline-{self.first}.json.gz")

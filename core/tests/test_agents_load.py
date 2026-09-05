@@ -29,9 +29,8 @@ class TestAgentsLoad(unittest.TestCase):
         ~800 deep-mode dispatches was Opus. sonnet = mechanical, bounded, single-artifact;
         haiku = one label on one summary; inherit = judgement."""
         SONNET = {"kavach-reporter", "kavach-poc", "kavach-intel", "kavach-supply",
-                  "kavach-longshot-hunter", "kavach-longshot-aggregator",
                   "kavach-confirm-reporter", "kavach-test-mapper", "kavach-env-detective",
-                  "kavach-kb-loader", "kavach-wave"}
+                  "kavach-kb-loader"}
         HAIKU = {"kavach-triager"}
         tiers = {}
         for path in glob.glob(os.path.join(ROOT, "agents", "kavach-*.md")):
@@ -39,7 +38,7 @@ class TestAgentsLoad(unittest.TestCase):
             self.assertIn(fm.get("model"), ("inherit", "sonnet", "haiku"), path)
             tiers[fm["name"]] = fm["model"]
 
-        self.assertEqual(len(tiers), 40)
+        self.assertEqual(len(tiers), 37)
         self.assertEqual({n for n, m in tiers.items() if m == "sonnet"}, SONNET)
         self.assertEqual({n for n, m in tiers.items() if m == "haiku"}, HAIKU)
         # runs live exploits under the confirm charter - the last place to economise
