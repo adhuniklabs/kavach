@@ -26,6 +26,14 @@ from . import flags, state
 
 DEFAULT_MAX_DISPATCHES = {"lite": 15, "balanced": 60, "deep": 120}
 DEFAULT_MAX_WALL_SECONDS = 3 * 3600
+# The live tail's own ceiling, added to whichever preset runs it. Live validation provisions
+# an environment and executes per finding, so it is priced separately from audit depth.
+LIVE_DELTA = 30
+
+
+def default_ceiling(mode: str, live: bool = False) -> int:
+    return DEFAULT_MAX_DISPATCHES[mode] + (LIVE_DELTA if live else 0)
+
 
 UNLIMITED = "unlimited"
 WITHIN_BUDGET = "within budget"
@@ -57,9 +65,9 @@ def _audit(f: state.AuditStateFile, audit_id: str) -> state.AuditRunState:
 
 
 def _new_ledger(mode: str, max_dispatches: int | None, max_wall_seconds: int | None,
-                max_cost_usd: float | None = None) -> dict:
+                max_cost_usd: float | None = None, live: bool = False) -> dict:
     ceiling = (max_dispatches if max_dispatches is not None
-               else flags.max_dispatches(DEFAULT_MAX_DISPATCHES.get(mode, 60)))
+               else flags.max_dispatches(default_ceiling(mode, live)))
     wall = (max_wall_seconds if max_wall_seconds is not None
             else flags.max_wall_seconds(DEFAULT_MAX_WALL_SECONDS))
     cost = flags.max_cost_usd(0.0) if max_cost_usd is None else max_cost_usd
@@ -69,8 +77,9 @@ def _new_ledger(mode: str, max_dispatches: int | None, max_wall_seconds: int | N
 
 
 def init_budget(audit_dir: str, audit_id: str, mode: str, *, max_dispatches: int | None = None,
-                max_wall_seconds: int | None = None, max_cost_usd: float | None = None) -> dict:
-    ledger = _new_ledger(mode, max_dispatches, max_wall_seconds, max_cost_usd)
+                max_wall_seconds: int | None = None, max_cost_usd: float | None = None,
+                live: bool = False) -> dict:
+    ledger = _new_ledger(mode, max_dispatches, max_wall_seconds, max_cost_usd, live)
     state.mutate_state(audit_dir, lambda f: setattr(_audit(f, audit_id), "budget", ledger))
     return ledger
 

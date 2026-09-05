@@ -19,6 +19,10 @@ class TestInitBudget(unittest.TestCase):
         self.assertEqual(ledger["by_phase"], {})
         self.assertEqual(ledger["shed"], [])
 
+    def test_live_run_seeds_the_raised_ceiling(self):
+        ledger = budget.init_budget(self.dir, self.run.audit_id, "deep", live=True)
+        self.assertEqual(ledger["max_dispatches"], budget.default_ceiling("deep", live=True))
+
     def test_ledger_lives_in_the_audit_record_and_survives_reload(self):
         budget.init_budget(self.dir, self.run.audit_id, "deep", max_dispatches=9)
         reloaded = state.load_state(self.dir).audits[0]
@@ -56,6 +60,12 @@ class TestInitBudget(unittest.TestCase):
             self.assertEqual(flags.max_dispatches(120), 120)
         finally:
             del os.environ["KAVACH_MAX_DISPATCHES"]
+
+    def test_live_raises_the_ceiling_by_its_own_delta(self):
+        self.assertEqual(budget.DEFAULT_MAX_DISPATCHES["deep"], 120)
+        self.assertEqual(budget.LIVE_DELTA, 30)
+        self.assertEqual(budget.default_ceiling("deep", live=True), 150)
+        self.assertEqual(budget.default_ceiling("lite", live=False), 15)
 
 
 class TestCheckAndCharge(unittest.TestCase):

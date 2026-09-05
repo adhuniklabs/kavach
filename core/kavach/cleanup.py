@@ -13,7 +13,7 @@ import shutil
 
 from filelock import FileLock, Timeout
 
-TRANSIENT = ("tmp", "findings-draft", "confirm-workspace")
+TRANSIENT = ("tmp", "findings-draft", "live-workspace")
 DURABLE = ("audit-state.json", "recon.json", "file-manifest.txt", "sweep-summary.json",
            "findings.json", "controls.json", "events.jsonl", "attack-surface", "findings",
            "findings-deferred", "findings-stale", "reports", "runs",

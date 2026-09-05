@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 
-from kavach import state
+from kavach import modes, state
 from kavach.cli import main
 from kavach.finding import Finding, Location, Severity, dump_findings
 from kavach.findings_tree import consolidate
@@ -316,6 +316,37 @@ class TestCmdResume(unittest.TestCase):
         # there means MODE ends up as the literal string "mode:".
         self.assertEqual(lines[0], "balanced")
         self.assertIn("recon", lines)
+
+    def test_resume_reoffers_the_live_tail(self):
+        """A --live audit persists no `live` flag of its own - only the tail phase ids in
+        run.phases. Everything the base `lite` preset needs is already satisfied here, so
+        without reconstructing `live` from run.phases, resume would see cleanup's induced
+        prereqs (rerouted around the untouched tail) as satisfied too and hand back only
+        `cleanup` - reporting five untouched phases as a finished audit."""
+        state.init_audit(self.dir, "lite", modes.phases_for("lite", True), repository="o/r")
+        with open(os.path.join(self.dir, "recon.json"), "w", encoding="utf-8") as fh:
+            fh.write("{}")
+        with open(os.path.join(self.dir, "sweep-summary.json"), "w", encoding="utf-8") as fh:
+            fh.write("{}")
+        os.makedirs(os.path.join(self.dir, "attack-surface"))
+        with open(os.path.join(self.dir, "attack-surface",
+                               "source-sink-flows-all-severities.md"), "w", encoding="utf-8") as fh:
+            fh.write("x")
+        with open(os.path.join(self.dir, "attack-surface", "poc-coverage.json"),
+                 "w", encoding="utf-8") as fh:
+            json.dump({"complete": True}, fh)
+        os.makedirs(os.path.join(self.dir, "reports"))
+        with open(os.path.join(self.dir, "reports", "final-audit-report.md"),
+                 "w", encoding="utf-8") as fh:
+            fh.write("x" * 600)
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = main(["resume", "--out", self.dir])
+        self.assertEqual(rc, 0)
+        lines = buf.getvalue().splitlines()
+        self.assertIn("inventory", lines)
+        self.assertNotIn("cleanup", lines)
 
     def test_resume_line_one_is_bare_mode_after_state_init(self):
         main(["state", "init", "--out", self.dir, "--mode", "lite"])

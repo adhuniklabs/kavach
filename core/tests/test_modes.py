@@ -121,6 +121,23 @@ class TestModes(unittest.TestCase):
             with self.assertRaises(KeyError, msg=name):
                 modes.phases_for(name)
 
+    def test_live_phases_are_absent_without_the_flag(self):
+        for mode in modes.MODES:
+            planned = set(modes.phases_for(mode))
+            self.assertFalse(planned & modes.LIVE_PHASES, mode)
+
+    def test_live_appends_the_tail_to_any_preset(self):
+        for mode in modes.MODES:
+            planned = modes.phases_for(mode, True)
+            self.assertTrue(modes.LIVE_PHASES.issubset(set(planned)), mode)
+            self.assertEqual(planned[-1], "cleanup", mode)
+            self.assertLess(planned.index("certify"), planned.index("cleanup"), mode)
+
+    def test_certify_is_the_only_confirmation_report(self):
+        self.assertEqual(modes.gate_for("certify"), ["reports/confirmation-report.md"])
+        for phase in modes.phases_for("deep"):
+            self.assertNotIn("confirmation-report.md", "".join(modes.gate_for(phase)))
+
 
 if __name__ == "__main__":
     unittest.main()

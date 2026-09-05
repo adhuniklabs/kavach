@@ -435,7 +435,8 @@ def cmd_state(args) -> int:
         ledger = budget_mod.init_budget(out, run.audit_id, args.mode,
                                         max_dispatches=args.budget,
                                         max_wall_seconds=args.max_wall_seconds,
-                                        max_cost_usd=args.max_cost_usd)
+                                        max_cost_usd=args.max_cost_usd,
+                                        live=args.live)
         events.emit(out, "audit_start", audit_id=run.audit_id, mode=args.mode,
                     budget=ledger["max_dispatches"], wall=ledger["max_wall_seconds"],
                     max_cost_usd=ledger["max_cost_usd"])
@@ -577,9 +578,8 @@ def cmd_events(args) -> int:
 
 
 def cmd_inventory(args) -> int:
-    """The `inventory` phase. Was 'enumerate findings/ yourself' in SKILL.md, so every
-    harness wrote the same loop - and wrote it to confirm-workspace/, which `cleanup`
-    then deletes."""
+    """The live tail's opening pass. Was 'enumerate findings/ yourself' in SKILL.md, so
+    every harness wrote the same loop - and wrote it somewhere cleanup then deleted."""
     out = _out_dir(args)
     entries = []
     for path in sorted(glob.glob(os.path.join(out, "findings", "*"))):
@@ -726,7 +726,7 @@ def _write_diff_scope(out: str, prior: str, files: list[str], in_scope: bool) ->
 
 
 def cmd_resume(args) -> int:
-    from . import gitinfo, runner, state
+    from . import gitinfo, modes, runner, state
     out = _out_dir(args)
     run = state.find_audit(out, args.audit) if args.audit else state.latest_resumable_audit(out)
     if run is None:
@@ -758,8 +758,13 @@ def cmd_resume(args) -> int:
         _log("  findings already on disk cite the earlier tree. "
              "`kavach since` shows what changed.")
 
+    # No `live` flag is persisted - the tail phase ids already are, in run.phases, since
+    # state.init_audit was seeded from modes.phases_for(mode, live). Re-deriving it from
+    # there is exact, not a guess, and needs no new state field or migration.
+    live = bool(set(run.phases) & modes.LIVE_PHASES)
+
     print(run.mode)
-    for phase in runner.next_actionable(out, run.mode):
+    for phase in runner.next_actionable(out, run.mode, live):
         print(phase)
     return 0
 
@@ -1022,7 +1027,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--since", type=int, default=0, help="skip the first N lines")
     sp.set_defaults(func=cmd_events)
 
-    sp = sub.add_parser("inventory", help="index findings/ into the confirm inventory")
+    sp = sub.add_parser("inventory", help="index findings/ into the live-validation inventory")
     add_common(sp); sp.set_defaults(func=cmd_inventory)
 
     sp = sub.add_parser("phase-prompt", help="emit the composed sub-agent prompt for a phase")
