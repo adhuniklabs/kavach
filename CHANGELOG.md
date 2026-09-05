@@ -7,9 +7,15 @@ All notable changes to Adhunik Kavach are documented here. Format follows
 
 Eight modes collapse into three intensity presets over one pipeline. This is a breaking release:
 phase ids changed, gate filenames changed, and five modes are gone. Finished audits are unaffected -
-`findings/` and `reports/` are exactly what they were. An **in-progress** audit dir is not: its
-`audit-state.json` records phase ids this engine no longer knows, gated on filenames nothing writes
-any more, so start a fresh audit dir rather than resuming one across this release.
+`findings/` and `reports/` are exactly what they were.
+
+An **in-progress** audit dir does not carry across, and `kavach resume` refuses one rather than
+guessing. On 0.x the minor is the breaking axis `state.version_compatible` checks, because what
+breaks across one is exactly what resume depends on - the phase list, the prereq graph, and which
+artifact closes a gate. All three moved here, so the engine version moves to `0.3.0` with them: a dir
+written by any 0.2.x exits `4` naming the engine that made it, instead of re-deriving "what is left"
+under a contract that never produced the artifacts on disk. Start a fresh audit dir, or install the
+release that made the old one to finish it.
 
 ### Eight modes, six advertised, and nobody could tell which was which
 

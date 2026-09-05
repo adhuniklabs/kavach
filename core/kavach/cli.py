@@ -172,14 +172,14 @@ def cmd_merge_run(args) -> int:
         _log("KAVACH merge-run → need at least 2 --dir sources")
         return 5
 
-    index = mf.index_sources(out, dirs)                                      # MG1
+    index = mf.index_sources(out, dirs)                        # alias + exact-fingerprint dedupe
     workspace = os.path.join(out, "tmp", "merge-workspace")
     merged = load_findings(os.path.join(workspace, "findings-merged.json"))
-    merged, dedup_notes = mf.apply_dedup_decisions(out, merged)               # MG2, if run
-    ordered = mf.severity_renumber(merged)                                    # MG5 basis
+    merged, dedup_notes = mf.apply_dedup_decisions(out, merged)   # chamber's semantic dedupe, if run
+    ordered = mf.severity_renumber(merged)                        # the renumbering basis
 
-    promoted = consolidate(out, ordered)                                      # MG6
-    renames = mf.rename_map(dirs, promoted)                                   # MG5 artifact
+    promoted = consolidate(out, ordered)                          # into findings/
+    renames = mf.rename_map(dirs, promoted)                       # old per-source id -> merged id
     mf.write_rename_map(out, renames)
     mf.merge_summary(out, {"sources": index["sources"], "renames": renames, "dedup": dedup_notes})
 

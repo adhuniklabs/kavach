@@ -196,8 +196,8 @@ class TestCmdMergeRun(unittest.TestCase):
 
     def test_shared_finding_across_sources_promotes_once(self):
         # same finding (same fingerprint) reported independently by two source audits -
-        # MG1's sweep.dedupe must collapse it before MG6 promotes, or the merged set
-        # double-counts a single defect.
+        # index_sources' sweep.dedupe must collapse it before consolidate promotes, or the
+        # merged set double-counts a single defect.
         shared = Finding(title="SQLi", severity=Severity.HIGH, category="A01",
                          source="kavach-sast", locations=[Location(file="x.py", line=1)])
         dump_findings([shared], os.path.join(self.src_a, "findings.json"))
@@ -210,9 +210,9 @@ class TestCmdMergeRun(unittest.TestCase):
         self.assertEqual(len(promoted), 1)
 
     def test_merge_run_consumes_dedup_decisions_if_present(self):
-        # two DIFFERENT-fingerprint findings that kavach-chamber (MG2) judged to be the
-        # same underlying defect described differently - only sweep.dedupe's exact-match
-        # can't catch this, so merge-run must read dedup-decisions.json if it exists.
+        # two DIFFERENT-fingerprint findings that kavach-chamber judged to be the same
+        # underlying defect described differently - sweep.dedupe's exact match cannot catch
+        # this, so merge-run must read dedup-decisions.json if it exists.
         f_a = Finding(title="SQLi via string concat", severity=Severity.CRITICAL, category="A01",
                      source="kavach-sast", locations=[Location(file="x.py", line=1)])
         f_b = Finding(title="SQLi via f-string", severity=Severity.HIGH, category="A01",

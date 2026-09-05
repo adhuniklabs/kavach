@@ -1,7 +1,7 @@
 # Adapted from piolium (github.com/vigolium/piolium) - MIT License, (c) j3ssie.
-"""Merge-mode (MG1-MG7) deterministic core: aliasing, exact dedup, renumber, summary.
+"""The `kavach merge-run` verb's deterministic core: aliasing, exact dedup, renumber, summary.
 
-Semantic near-duplicate collapsing (MG2) is chamber-driven at runtime - a subagent's
+Semantic near-duplicate collapsing is chamber-driven at runtime - a subagent's
 judgment call, not this module's. What the deterministic core owns is the mechanical
 half: give each source a stable alias, fold exact fingerprint duplicates across
 sources via sweep.dedupe, produce a stable severity-ordered renumbering, and render
@@ -18,8 +18,8 @@ from .finding import Finding, dump_findings, load_findings
 from .sweep import dedupe
 
 _WORKSPACE = os.path.join("tmp", "merge-workspace")
-# The bulky per-source intermediates stay transient; the three artifacts the MG gates
-# resolve against are durable, so cleanup can no longer reopen a finished merge.
+# The bulky per-source intermediates stay transient; the three artifacts a reader or a
+# re-run needs are durable, so cleanup can no longer discard a finished merge.
 _GATE_DIR = "attack-surface"
 
 
@@ -64,11 +64,11 @@ def index_sources(audit_dir: str, source_dirs: list[str]) -> dict:
 
 
 def apply_dedup_decisions(audit_dir: str, findings: list[Finding]) -> tuple[list[Finding], list[str]]:
-    """Fold kavach-chamber's semantic near-duplicate decisions (MG2) into the merged set.
+    """Fold kavach-chamber's semantic near-duplicate decisions into the merged set.
 
     ``attack-surface/merge-dedup-decisions.json`` is a list of ``{"drop": <fingerprint>,
     "keep": <fingerprint>, "reason": ...}`` objects, one per pair the chamber judged to be
-    the same underlying defect described differently across sources. MG1's exact-fingerprint
+    the same underlying defect described differently across sources. The exact-fingerprint
     dedupe (``sweep.dedupe`` inside ``index_sources``) already collapsed identical findings;
     this is the semantic layer on top of that. Absent the file - the chamber wasn't
     dispatched for this merge - findings pass through unchanged.

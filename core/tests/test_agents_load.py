@@ -24,6 +24,15 @@ class TestAgentsLoad(unittest.TestCase):
             fm, _ = self._frontmatter(path)
             self.assertIn("name", fm, path)
 
+    def test_the_kavach_skill_itself_parses(self):
+        """`skills/*/SKILL.md` never covered `skill/SKILL.md` - the entry point the whole skill
+        loads through. An unquoted `: ` anywhere in `description:` makes the block unparseable,
+        and the rest of this suite passes with it broken."""
+        fm, _ = self._frontmatter(os.path.join(ROOT, "skill", "SKILL.md"))
+        self.assertIsInstance(fm, dict)
+        for key in ("name", "description"):
+            self.assertTrue(fm.get(key), f"skill/SKILL.md: empty or missing {key}")
+
     def test_model_tiering_is_applied_and_not_all_inherit(self):
         """§2 A6: all 40 agents were `model: inherit`, so on an Opus session every one of
         ~800 deep-mode dispatches was Opus. sonnet = mechanical, bounded, single-artifact;
@@ -41,7 +50,7 @@ class TestAgentsLoad(unittest.TestCase):
         self.assertEqual(len(tiers), 37)
         self.assertEqual({n for n, m in tiers.items() if m == "sonnet"}, SONNET)
         self.assertEqual({n for n, m in tiers.items() if m == "haiku"}, HAIKU)
-        # runs live exploits under the confirm charter - the last place to economise
+        # runs live exploits under the live-validation charter - the last place to economise
         self.assertEqual(tiers["kavach-poc-executor"], "inherit")
 
     def test_tier_mirrors_model_so_the_two_cannot_drift(self):
