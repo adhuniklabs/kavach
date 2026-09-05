@@ -174,8 +174,8 @@ engine dispatches instead of the skill).
 
 ## The scope
 
-A hunter spends most of its budget on *discovery* - grep for a symbol, open the file, follow the
-import, repeat - before it reaches the line it will cite.
+A hunter spends most of its budget on *discovery* - which of thousands of files to open first -
+not on the line it eventually cites.
 
 `kavach scope [--agent A]` ranks `file-manifest.txt` by security relevance and writes
 `attack-surface/scope[-<agent>].json`, which `phase_prompt` names as an input (the agent's own

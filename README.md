@@ -129,8 +129,8 @@ On a large repo, one more before the fan-out:
 kavach scope --agent kavach-billing --limit 200  # rank the manifest by security relevance
 ```
 
-It's optional and cuts discovery cost - the budget a hunter otherwise spends following imports by
-hand before it reaches the line it cites.
+It's optional and cuts discovery cost - the budget a hunter otherwise spends deciding which file
+to open first, not the line it eventually cites.
 
 `tier:` is `model:` spelled provider-neutrally, so a non-Claude harness can route each agent without
 knowing Anthropic's model names. See [`docs/orchestration.md`](./docs/orchestration.md).
