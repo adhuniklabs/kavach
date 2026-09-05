@@ -83,10 +83,13 @@ def _audit_id(out: str) -> str | None:
 
 
 def _empty_recon() -> dict:
-    """Safe stand-in for render() when recon.json was never written - balanced and deep
-    can reach a report phase without a core:recon pass in their own audit dir. Every
-    renderer reads recon fields via .get() with its own fallback, so an empty stack
-    fingerprint here just means an honest "unknown stack" report, not a crash."""
+    """Safe stand-in for render() when recon.json was never written - `kavach merge`
+    assembles a findings.json in a dir that never had a core:recon pass of its own, and the
+    merged dir `cmd_merge_run` builds out of source audits is exactly such a dir. (Every
+    preset schedules `recon` first, so a dir the pipeline drove itself always has one.)
+    Every renderer reads recon fields via .get() with its own fallback, so an empty stack
+    fingerprint here just means an honest "unknown stack" report, not the FileNotFoundError
+    that would leave `render`'s gate unsatisfiable in that dir."""
     return {
         "root": "", "totals": {"files": 0, "code_files": 0, "by_language": {}, "by_extension": {}},
         "languages": [], "manifests": [], "frameworks": [], "datastores": [], "orms": [],

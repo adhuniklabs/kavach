@@ -13,7 +13,7 @@ deep` - so a phase id means the same work, reads the same inputs and writes the 
 whichever preset scheduled it.
 
 A phase is "done" when its gate artifact(s) exist on disk (see `docs/output-structure.md`), not
-merely when `audit-state.json` says so - an interrupted run resumes from real progress. Three gate
+merely when `audit-state.json` says so - an interrupted run resumes from real progress. Four gate
 rules on top of "the glob matches", all enforced in `runner.gate_satisfied`:
 
 - **Report phases** (`reports/final-audit-report.md`, `reports/confirmation-report.md`) require the
@@ -23,6 +23,12 @@ rules on top of "the glob matches", all enforced in `runner.gate_satisfied`:
 - **Coverage artifacts** (`attack-surface/poc-coverage.json`, `report-coverage.json`) must parse
   **and** carry `"complete": true`. The file existing is not enough - that is the whole point of
   them, and it is why `kavach coverage` must run after every PoC/report batch rather than once.
+- **`cleanup`** requires its summary **and** an audit dir with no `cleanup.TRANSIENT` path left in
+  it. The summary is durable and the phase has no roster, so on the artifact alone `cleanup` would
+  be satisfied for the life of the dir - and both second passes this release advertises (`--live`
+  over a finished audit, a heavier preset re-run over one) recreate `tmp/` and `findings-draft/`.
+  Gating on both re-opens `cleanup` for the second pass and leaves a genuinely clean dir alone, so
+  the plan loop still terminates.
 - **No gate may resolve under a path in `cleanup.TRANSIENT`** (`tmp/`, `findings-draft/`,
   `live-workspace/`), enforced by `test_modes.py::test_no_gate_under_transient`. A gate that
   `cleanup` deletes makes its phase eligible again on every resume, so the run pays for the same

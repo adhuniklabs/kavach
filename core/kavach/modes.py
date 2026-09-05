@@ -117,9 +117,10 @@ PHASE_AGENT: dict[str, str] = {
 }
 
 # phase -> required artifact globs (relative to the audit dir) that prove completion.
-# A gate is satisfied when every glob matches at least one file. Report phases add a
-# size check and *-coverage.json gates a complete:true check, both enforced by
-# runner.gate_satisfied (see runner.py).
+# A gate is satisfied when every glob matches at least one file. Report phases add a size
+# check, *-coverage.json gates a complete:true check, and `cleanup` additionally demands an
+# audit dir with no transient path left in it - all enforced by runner.gate_satisfied
+# (see runner.py).
 #
 # The two report artifacts live under reports/. runner.gate_satisfied also falls back
 # to the legacy audit-root path so an existing tree still gates complete; new runs write
@@ -154,7 +155,9 @@ PHASE_GATES: dict[str, list[str]] = {
     "testgen": ["attack-surface/test-mapping.json"],
     "certify": ["reports/confirmation-report.md"],
     # Not mode-flavoured, unlike the three per-mode names it replaces: one phase shared by
-    # three presets cannot gate on a filename that varies with the preset.
+    # three presets cannot gate on a filename that varies with the preset. The prefix was
+    # also what re-opened cleanup for a second pass over the same audit dir; that job now
+    # belongs to gate_satisfied's transient check, not to the filename.
     "cleanup": ["attack-surface/cleanup-summary.json"],
 }
 

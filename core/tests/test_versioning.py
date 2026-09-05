@@ -31,6 +31,11 @@ class TestVersionSingleSource(unittest.TestCase):
         self.assertIn('dynamic = ["version"]', text)
         self.assertIn('version = { attr = "kavach.__version__" }', text)
 
+    def test_the_readme_badge_names_this_version(self):
+        """It said 0.1.0 through two minors, because nothing read it back."""
+        text = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+        self.assertIn(f"badge/version-{__version__}-", text)
+
     def test_the_changelog_has_an_entry_for_this_version(self):
         """Bumping the code and forgetting the changelog ships a release nobody can read."""
         text = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read()

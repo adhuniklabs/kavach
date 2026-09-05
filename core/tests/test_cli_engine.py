@@ -256,12 +256,27 @@ class TestMalformedJsonIsToolingError(unittest.TestCase):
 
 
 class TestCmdRenderWithoutRecon(unittest.TestCase):
-    """balanced/deep can reach a report phase in an audit dir that never had a core:recon
-    pass of its own - render must still produce a report, not crash with FileNotFoundError
-    (which would leave `render`'s gate unsatisfiable forever)."""
+    """`kavach merge` assembles a findings.json in a dir that never had a core:recon pass
+    of its own - the merged dir `merge-run` builds is exactly such a dir - and render must
+    still produce a report there, not crash with FileNotFoundError (which would leave
+    `render`'s gate unsatisfiable in that dir). Every preset schedules `recon` first, so
+    an audit dir the pipeline drove itself always has recon.json."""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
+
+    def test_a_merged_dir_renders_although_nothing_ran_recon_in_it(self):
+        src = tempfile.mkdtemp()
+        dump_findings([Finding(title="SQLi", severity=Severity.HIGH, category="A01", source="s",
+                               locations=[Location(file="a.py", line=1)])],
+                      os.path.join(src, "findings.json"))
+        rc = main(["merge", "--out", self.dir, "--extra", os.path.join(src, "findings.json")])
+        self.assertEqual(rc, 0)
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "recon.json")))
+
+        rc = main(["render", "--out", self.dir, "--format", "md", "--severity-only",
+                   "--output", os.path.join(self.dir, "reports", "final-audit-report.md")])
+        self.assertEqual(rc, 0)
 
     def test_render_with_no_recon_json_still_writes_a_report(self):
         self.assertFalse(os.path.exists(os.path.join(self.dir, "recon.json")))

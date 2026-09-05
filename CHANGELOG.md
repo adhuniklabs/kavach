@@ -96,6 +96,13 @@ one `probe-summary.md`; `lite-q2-summary.md` is `source-sink-flows-all-severitie
 result is **26 phases and 26 distinct gate artifacts, one apiece** - no phase can be closed by
 another phase's output, which four `revisit` phases sharing a `findings/` gate used to allow.
 
+The prefix was quietly doing a second job: it was also what re-opened `cleanup` for a second pass
+over the same audit dir. That job now belongs to the gate rule instead of the filename - `cleanup`
+is satisfied by its summary **and** an audit dir with no `tmp/`, `findings-draft/` or
+`live-workspace/` left in it. So a `--live` tail over a finished audit, or a heavier preset re-run
+over one, gets its own cleanup pass rather than inheriting the first run's summary and leaving its
+own transient state (seeded credentials included) on disk.
+
 ### `lite` produces a report
 
 `lite` now schedules `render`, so it ends in `reports/final-audit-report.md` instead of a bare

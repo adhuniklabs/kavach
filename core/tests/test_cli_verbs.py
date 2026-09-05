@@ -12,7 +12,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
-from kavach import budget, coverage, flags, modes, runner, state, triage
+from kavach import budget, cleanup, coverage, dispatch, flags, modes, runner, state, triage
 from kavach.cli import main
 from kavach.finding import (Confidence, Finding, Location, Severity, dump_findings,
                             load_findings)
@@ -273,6 +273,21 @@ class TestBudgetVerb(unittest.TestCase):
     def test_budget_verbs_without_an_audit_are_a_tooling_error(self):
         self.assertEqual(self._run("budget", "check", "--phase", "hunt", "--planned", "1")[0], 5)
         self.assertEqual(self._run("budget", "show")[0], 0)
+
+    def test_a_pre_0_3_mode_string_accounts_rather_than_crashing(self):
+        """`revisit` was a mode until 0.3.0, and seeding a ledger for an audit-state.json
+        written before then is the whole reason budget._ensure exists. It indexed the preset
+        table with the mode it read off disk, and main() handles no KeyError - so these two
+        verbs answered a legacy dir with a traceback instead of a documented exit code."""
+        with open(os.path.join(self.dir, "audit-state.json"), "w", encoding="utf-8") as fh:
+            json.dump({"audits": [{"audit_id": "2026-01-01T00:00:00Z-1-abcd1234",
+                                   "mode": "revisit", "status": "in_progress",
+                                   "phases": {"hunt": {"status": "pending"}}}]}, fh)
+        rc, payload, _ = self._run("budget", "check", "--phase", "hunt", "--planned", "2")
+        self.assertEqual(rc, 0)
+        self.assertEqual(json.loads(payload)["allowed"], 2)
+        self.assertEqual(self._run("budget", "charge", "--phase", "hunt", "-n", "2")[0], 0)
+        self.assertEqual(json.loads(self._run("budget", "show")[1])["dispatches"], 2)
 
 
 class TestFlagEnvMirroring(unittest.TestCase):
@@ -749,3 +764,97 @@ class TestRemovedModeNames(unittest.TestCase):
             code, out = self._run("plan", "--out", self.audit, "--mode", name)
             self.assertNotEqual(code, 0, name)
             self.assertIn(hint, out, name)
+
+
+def _gate_body(pat: str) -> str:
+    """Enough to satisfy every refinement gate_satisfied applies: coverage artifacts must
+    say complete, report artifacts must clear the minimum size, the rest need only exist."""
+    return json.dumps({"complete": True}) if pat.endswith(".json") else "KAVACH\n" + "x" * 600
+
+
+def _close_gate(audit_dir: str, phase: str) -> None:
+    for pat in modes.gate_for(phase):
+        path = os.path.join(audit_dir, pat)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(_gate_body(pat))
+
+
+def _finish(audit_dir: str, mode: str) -> None:
+    """What a completed pass over `mode` leaves on disk: every gate artifact closed, a
+    banked result for every member of a fan-out roster, and cleanup having actually run."""
+    for phase in modes.phases_for(mode):
+        _close_gate(audit_dir, phase)
+        roster = modes.roster_for(phase, mode)
+        if len(roster) > 1:
+            for i, agent in enumerate(roster, start=1):
+                with open(dispatch.result_path(audit_dir, phase, agent, index=i),
+                          "w", encoding="utf-8") as fh:
+                    json.dump({"findings": []}, fh)
+    cleanup.cleanup(audit_dir, mode)
+
+
+class TestSecondPassOverAFinishedAuditDir(unittest.TestCase):
+    """`--live` over a finished dir and re-running a heavier preset are the two migration
+    paths that replaced `confirm` and `revisit` modes, and both are documented to end in
+    `cleanup`. Gating that phase on its summary file alone made it unreachable a second
+    time: the first pass wrote the summary, nothing removes it, and an empty roster means
+    fanout_pending cannot re-open the phase either. So the second pass's tmp/ and
+    findings-draft/ - env-connection.json's seeded credentials included - stayed on disk
+    with no cleanup left to run, and the summary still described the first pass."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+
+    def _plan(self, mode: str, *flags: str) -> list[str]:
+        buf = io.StringIO()
+        with redirect_stdout(buf), redirect_stderr(io.StringIO()):
+            code = main(["plan", "--out", self.dir, "--mode", mode, *flags])
+        self.assertEqual(code, 0)
+        return buf.getvalue().split()
+
+    def test_live_over_a_finished_dir_plans_the_tail_and_then_cleanup(self):
+        _finish(self.dir, "deep")
+        self.assertEqual(self._plan("deep", "--live"), ["inventory"])
+
+        for phase in ("inventory", "envscan", "provision", "exploit", "testgen", "certify"):
+            self.assertIn(phase, self._plan("deep", "--live"), phase)
+            _close_gate(self.dir, phase)
+            if phase == "provision":
+                # the transient half of provisioning: the live target's seeded credentials,
+                # which the charter says may not outlive the run
+                creds = os.path.join(self.dir, "tmp", "confirm", "env-connection.json")
+                os.makedirs(os.path.dirname(creds), exist_ok=True)
+                with open(creds, "w", encoding="utf-8") as fh:
+                    json.dump({"password": "seeded"}, fh)
+
+        self.assertEqual(self._plan("deep", "--live"), ["cleanup"])
+        cleanup.cleanup(self.dir, "deep")
+        self.assertEqual(self._plan("deep", "--live"), [])
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "tmp")))
+
+    def test_re_running_a_heavier_preset_offers_cleanup_again(self):
+        _finish(self.dir, "lite")
+        self.assertNotIn("cleanup", self._plan("balanced"))   # the lite pass left it clean
+
+        # what the second pass adds: balanced ingests its agent results as drafts under
+        # findings-draft/, which is transient and which only a cleanup phase removes
+        draft = os.path.join(self.dir, "findings-draft", "hunt-001-sqli.md")
+        os.makedirs(os.path.dirname(draft), exist_ok=True)
+        with open(draft, "w", encoding="utf-8") as fh:
+            fh.write("# SQLi\n")
+        self.assertIn("cleanup", self._plan("balanced"))
+
+        cleanup.cleanup(self.dir, "balanced")
+        self.assertNotIn("cleanup", self._plan("balanced"))
+        with open(os.path.join(self.dir, "attack-surface", "cleanup-summary.json"),
+                  encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh)["mode"], "balanced")
+
+    def test_a_clean_finished_dir_plans_nothing_at_all(self):
+        # The plan loop terminates on empty output, so re-offering cleanup on a dir it has
+        # already cleaned would spin it forever.
+        _finish(self.dir, "deep")
+        self.assertEqual(self._plan("deep"), [])
+        cleanup.cleanup(self.dir, "deep")
+        self.assertEqual(self._plan("deep"), [])

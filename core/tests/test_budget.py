@@ -175,6 +175,27 @@ class TestCheckAndCharge(unittest.TestCase):
             budget.check(self.dir, "no-such-audit", "hunt", 1)
 
 
+class TestLegacyModeString(unittest.TestCase):
+    """A mode this engine no longer knows - `revisit`, `confirm`, `longshot`, `merge` and
+    `diff` were modes until 0.3.0 - read straight off an audit-state.json older than the
+    presets. Seeding a ledger for exactly those records is what `_ensure` is for, so it
+    accounts against the smallest preset ceiling instead of raising out of the preset
+    table: too low only sheds fan-out, and the shed is recorded."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.run = state.init_audit(self.dir, "revisit", ["hunt"], repository="o/r")
+
+    def test_check_and_charge_account_against_the_conservative_ceiling(self):
+        decision = budget.check(self.dir, self.run.audit_id, "hunt", 2)
+        self.assertEqual((decision.allowed, decision.dropped), (2, 0))
+        budget.charge(self.dir, self.run.audit_id, "hunt", 2, cost_usd=0.5)
+        ledger = state.load_state(self.dir).audits[0].budget
+        self.assertEqual(ledger["dispatches"], 2)
+        self.assertEqual(ledger["cost_usd"], 0.5)
+        self.assertEqual(ledger["max_dispatches"], min(budget.DEFAULT_MAX_DISPATCHES.values()))
+
+
 class TestShow(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()

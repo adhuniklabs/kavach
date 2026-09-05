@@ -32,7 +32,22 @@ LIVE_DELTA = 30
 
 
 def default_ceiling(mode: str, live: bool = False) -> int:
-    return DEFAULT_MAX_DISPATCHES[mode] + (LIVE_DELTA if live else 0)
+    """The preset's ceiling, or the smallest one for a mode this engine no longer knows.
+
+    `_ensure` seeds a ledger from whatever ``mode`` an ``audit-state.json`` carries, and the
+    records it exists for - pre-v0.3 - are exactly the ones naming `revisit`, `confirm`,
+    `longshot`, `merge` or `diff`. Indexing on that raised KeyError through a `main()` that
+    handles no such thing, so the CLI answered its own accounting verbs with a traceback.
+
+    `cmd_resume` refuses a pre-0.3 dir outright and is right to: it re-derives what is left
+    to run from a phase contract that has since changed, and a wrong answer there reports an
+    unfinished audit as a finished one. A ceiling makes no such claim - the dispatch, token
+    and cost counts stay exact whatever it is, and the only cost of picking the smallest one
+    is shedding fan-out, which is recorded at decision time and reaches the reader in the
+    report's Limits section. Not accounting at all is the worse failure.
+    """
+    ceiling = DEFAULT_MAX_DISPATCHES.get(mode, min(DEFAULT_MAX_DISPATCHES.values()))
+    return ceiling + (LIVE_DELTA if live else 0)
 
 
 UNLIMITED = "unlimited"

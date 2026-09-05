@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.1.0-c9a227">
+  <img alt="version" src="https://img.shields.io/badge/version-0.3.0-c9a227">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="python" src="https://img.shields.io/badge/python-3.9%2B-3776ab">
-  <img alt="tests" src="https://img.shields.io/badge/tests-653%20passing-2c8f52">
+  <img alt="tests" src="https://img.shields.io/badge/tests-662%20passing-2c8f52">
   <img alt="model" src="https://img.shields.io/badge/model-agnostic-5f4fce">
 </p>
 

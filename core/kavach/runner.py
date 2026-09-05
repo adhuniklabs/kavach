@@ -11,7 +11,7 @@ import glob
 import json
 import os
 
-from . import dispatch, modes, retry, state
+from . import cleanup, dispatch, modes, retry, state
 from .state import PhaseStatus
 
 _REPORT_GATES = {"reports/final-audit-report.md", "reports/confirmation-report.md"}
@@ -20,6 +20,7 @@ _REPORT_GATES = {"reports/final-audit-report.md", "reports/confirmation-report.m
 _LEGACY_ROOT = {gate: gate.split("/", 1)[1] for gate in _REPORT_GATES}
 _MIN_REPORT_BYTES = 500
 _COVERAGE_SUFFIX = "-coverage.json"
+_CLEANUP_GATES = frozenset(modes.gate_for("cleanup"))
 
 
 class PrereqError(Exception):
@@ -35,6 +36,21 @@ def _coverage_complete(path: str) -> bool:
         return False
 
 
+def _nothing_transient_left(audit_dir: str) -> bool:
+    """cleanup's postcondition is not "a summary was written once", it is "no transient path
+    remains" - and only the second one is still true after another pass over the same dir.
+
+    The summary is durable by design, so on the artifact alone the phase was satisfied for the
+    life of the audit dir; and with an empty roster, `fanout_pending` cannot re-open it either.
+    Both migration paths this engine advertises walk over a finished dir - `--live` for the
+    retired `confirm` mode, a heavier preset for `revisit` - and both recreate tmp/ and
+    findings-draft/, seeded credentials included, which then had no cleanup phase left to
+    remove them. Checked here rather than in `modes`, alongside the report-size and
+    coverage-complete refinements: the registry declares the gate, this decides satisfaction.
+    """
+    return not any(os.path.exists(os.path.join(audit_dir, rel)) for rel in cleanup.TRANSIENT)
+
+
 def gate_satisfied(audit_dir: str, phase: str) -> bool:
     patterns = modes.gate_for(phase)
     if not patterns:
@@ -48,6 +64,8 @@ def gate_satisfied(audit_dir: str, phase: str) -> bool:
         if pat in _REPORT_GATES and os.path.getsize(matches[0]) < _MIN_REPORT_BYTES:
             return False
         if pat.endswith(_COVERAGE_SUFFIX) and not _coverage_complete(matches[0]):
+            return False
+        if pat in _CLEANUP_GATES and not _nothing_transient_left(audit_dir):
             return False
     return True
 

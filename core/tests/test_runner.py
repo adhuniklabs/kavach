@@ -52,6 +52,15 @@ class TestRunner(unittest.TestCase):
         _touch(self.dir, "attack-surface/poc-coverage.json", content="{truncated")
         self.assertFalse(runner.gate_satisfied(self.dir, "poc"))
 
+    def test_cleanup_gate_needs_the_dir_to_be_clean_too(self):
+        # The summary alone satisfied this for the life of the audit dir: cleanup has an
+        # empty roster, so fanout_pending can never re-open it either. A second pass that
+        # made its own tmp/ or findings-draft/ got no cleanup phase to remove them.
+        _touch(self.dir, "attack-surface/cleanup-summary.json", content="{}")
+        self.assertTrue(runner.gate_satisfied(self.dir, "cleanup"))
+        os.makedirs(os.path.join(self.dir, "findings-draft"))
+        self.assertFalse(runner.gate_satisfied(self.dir, "cleanup"))
+
     def test_satisfied_phase_drops_out_of_actionable(self):
         _touch(self.dir, "recon.json")
         self.assertNotIn("recon", runner.next_actionable(self.dir, "balanced"))
