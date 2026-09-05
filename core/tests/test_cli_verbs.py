@@ -697,7 +697,7 @@ class TestHarnessVerbs(unittest.TestCase):
         consolidate(self.dir, _mixed_findings())
         code, _ = self._run("inventory", "--out", self.dir)
         self.assertEqual(code, 0)
-        gate = os.path.join(self.dir, "attack-surface", "confirm-findings-inventory.json")
+        gate = os.path.join(self.dir, "attack-surface", "live-inventory.json")
         self.assertTrue(os.path.exists(gate))
         with open(gate, encoding="utf-8") as fh:
             payload = json.load(fh)

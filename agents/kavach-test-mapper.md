@@ -272,7 +272,7 @@ with a value only, never a sentence pointing at another file. Never touch any ot
 
 ## Gate artifact
 
-CF5's gate is `.kavach/attack-surface/confirm-test-mapping.json` - durable, one row per finding:
+CF5's gate is `.kavach/attack-surface/test-mapping.json` - durable, one row per finding:
 display id, the framework chosen, the generated test's path, the run verdict, and the timestamp.
 
 ```json

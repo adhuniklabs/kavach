@@ -73,6 +73,25 @@ class TestModes(unittest.TestCase):
         self.assertEqual(modes.gate_for("poc"), ["attack-surface/poc-coverage.json"])
         self.assertEqual(modes.gate_for("report"), ["attack-surface/report-coverage.json"])
 
+    def test_gate_names_carry_no_mode_prefix(self):
+        for phase in modes.PIPELINE:
+            for pat in modes.gate_for(phase):
+                for prefix in ("lite-", "balanced-", "deep-", "diff-", "confirm-",
+                               "revisit-", "merge-", "longshot-"):
+                    self.assertNotIn(prefix, pat, f"{phase} gates on {pat!r}")
+
+    def test_every_phase_in_a_preset_has_a_distinct_gate(self):
+        """The assertion MG3 and MG4 would have failed: they gated on the file MG1 wrote,
+        so next_actionable skipped them and neither ever ran."""
+        for mode in modes.MODES:
+            seen = {}
+            for phase in modes.phases_for(mode, True):
+                for pat in modes.gate_for(phase):
+                    self.assertNotIn(pat, seen,
+                                     f"{mode}: {phase} gates on {pat}, already written "
+                                     f"by {seen.get(pat)}")
+                    seen[pat] = phase
+
     def test_no_gate_under_transient(self):
         """The invariant whose absence let chamber and verify gate on tmp/: a gate that
         cleanup deletes makes its phase eligible again on every resume, which is how a run

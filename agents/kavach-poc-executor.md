@@ -286,7 +286,7 @@ entirely.
 
 ## Gate artifact - verdicts and pointers only
 
-CF4's gate is `.kavach/attack-surface/confirm-poc-results.json`, and it is **durable** - it survives
+CF4's gate is `.kavach/attack-surface/poc-results.json`, and it is **durable** - it survives
 CF7's cleanup. It carries one row per attempt: the finding's display id, the verdict, the exit
 status, timestamps, and a **pointer** to the evidence.
 

@@ -277,7 +277,7 @@ If the database is external/managed (no container), skip snapshotting and set
 
 ## Gate artifact - redacted by contract
 
-CF3's gate is `.kavach/attack-surface/confirm-env-connection.json`, and it is **durable** - it
+CF3's gate is `.kavach/attack-surface/env-connection.json`, and it is **durable** - it
 survives CF7's cleanup, so what goes in it is what a reader may still find on disk long after the
 run. It carries **only**:
 

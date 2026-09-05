@@ -20,7 +20,7 @@ domain specialist and the reconciler, not to you.
 - **Intent corpus**: `$TARGET/.kavach/attack-surface/intent-corpus.json` (from `kavach-intent`).
   If this file does not exist, stop and report that the cross-check was skipped for lack of a
   corpus - do not fabricate one.
-- **Findings inventory**: `$TARGET/.kavach/attack-surface/confirm-findings-inventory.json` - the list of
+- **Findings inventory**: `$TARGET/.kavach/attack-surface/live-inventory.json` - the list of
   draft findings awaiting triage, each with an `id` (e.g. `C1`, `H2`, or a Medium-band id), a `slug`, and a `dir`
   pointing at `$TARGET/.kavach/findings/<id>-<slug>/`.
 - Each finding's **report**: `$TARGET/.kavach/findings/<id>-<slug>/report.md`.
@@ -46,7 +46,7 @@ For each finding in the inventory:
 
 ## Output 1 - verdicts file
 
-Write per-finding verdicts to `$TARGET/.kavach/attack-surface/confirm-intent-crosscheck.json` -
+Write per-finding verdicts to `$TARGET/.kavach/attack-surface/intent-crosscheck.json` -
 CF1_5's gate artifact. `attack-surface/`, never `findings-draft/` or `confirm-workspace/`: cleanup
 deletes both, and a deleted gate makes CF1_5 eligible again on every resume.
 

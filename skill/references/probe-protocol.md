@@ -29,11 +29,10 @@ cross-pollination), 5, and a single pass of Step 7 - no Step 6 looping.
   probe-summary.md
 ```
 
-Transient (`tmp/`) - wiped by the invoking mode's cleanup once `probe-summary.md`'s content is
-promoted into the durable gate artifact (`attack-surface/manual-attack-surface-inventory.md` for a
-light single-pass run, `attack-surface/deep-probe-summary.md` for a full run, or
-`attack-surface/revisit-probe-summary.md` for a revisit pass - see `docs/phase-reference.md` for
-which filename the invoking mode expects; none of these are phase ids).
+Transient (`tmp/`) - wiped by cleanup once this file's content is promoted into the durable gate
+artifact at the same name, `attack-surface/probe-summary.md` - one phase, one gate, regardless of
+preset. `kavach-probe` also maintains `attack-surface/manual-attack-surface-inventory.md` as a
+separate durable side artifact; it is not itself the gate.
 
 ## Step 1: attack surface + layer trust chain mapping
 

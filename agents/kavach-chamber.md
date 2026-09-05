@@ -267,14 +267,9 @@ Findings written: <count>. Patterns added to registry: <count>. Variant candidat
    Chamber Summary table, plus one paragraph of verdict prose, to the durable summary for your
    phase:
 
-   | Phase | Durable gate artifact |
-   |---|---|
-   | DP10 (deep) | `.kavach/attack-surface/deep-chamber-summary.md` |
-   | BL5 (balanced) | `.kavach/attack-surface/balanced-chamber-summary.md` |
-   | RV7 / RV8 (revisit) | `.kavach/attack-surface/revisit-r7-chamber-summary.md` / `revisit-r8-chamber-summary.md` |
-   | MG2 (merge) | `.kavach/attack-surface/merge-dedup-decisions.json` - the dedup decisions, not prose |
-
-   The runtime header you were dispatched with names the exact path. Write that path.
+   `chamber`'s gate is `.kavach/attack-surface/chamber-summary.md`, the same path regardless
+   of preset - one phase, one gate. The runtime header you were dispatched with names the
+   exact path. Write that path.
 4. Report back to whoever dispatched you: "Chamber `<chamber-id>` closed. Findings: `<count>`.
    Patterns: `<count>`."
 

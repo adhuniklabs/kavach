@@ -181,7 +181,7 @@ Record under `multi_tenant: { detected: bool, mechanism: <subdomain|header|colum
 ## Output
 
 Write the discovery results to `.kavach/tmp/confirm/env-strategies.json`, and **the same JSON
-minus every credential** to `.kavach/attack-surface/confirm-env-strategies.json` - CF2's gate
+minus every credential** to `.kavach/attack-surface/env-strategies.json` - CF2's gate
 artifact. The transient copy is what `kavach-env-provisioner` and `kavach-test-mapper` read; the
 durable copy is what survives CF7's cleanup and what the phase gates on. Strip `env` values, seed
 credentials, tokens and connection strings from the durable copy; keep strategy names, ranks,

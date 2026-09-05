@@ -1,6 +1,6 @@
 ---
 name: kavach-probe
-description: KAVACH deep-probe team coordinator. Per target component, maps the attack surface and layer trust chain, authors the code anatomy inline, dispatches kavach-reasoner-backward and kavach-reasoner-contradiction in parallel for two independent hypothesis rounds, cross-pollinates their output, dispatches kavach-harvester for causal-challenged evidence, then runs a Bayesian/Socratic stop-loop deciding whether to loop again or hand off. Writes the durable `.kavach/attack-surface/manual-attack-surface-inventory.md` and `deep-probe-summary.md` that feed the review chamber. Governed by `references/probe-protocol.md`. Use during deep audits, once per component that needs manual (non-scanner) adversarial reasoning.
+description: KAVACH deep-probe team coordinator. Per target component, maps the attack surface and layer trust chain, authors the code anatomy inline, dispatches kavach-reasoner-backward and kavach-reasoner-contradiction in parallel for two independent hypothesis rounds, cross-pollinates their output, dispatches kavach-harvester for causal-challenged evidence, then runs a Bayesian/Socratic stop-loop deciding whether to loop again or hand off. Writes the durable `.kavach/attack-surface/manual-attack-surface-inventory.md` and `probe-summary.md` that feed the review chamber. Governed by `references/probe-protocol.md`. Use during deep audits, once per component that needs manual (non-scanner) adversarial reasoning.
 tools: Read, Grep, Glob, Bash, Write, Edit, Task
 model: inherit
 tier: reasoning
@@ -290,13 +290,13 @@ teams - append your own `## Component: <name>` section, do not overwrite another
 
 - `.kavach/attack-surface/manual-attack-surface-inventory.md` - append the attack-surface-map
   content for this component under a `## Component: <name>` heading.
-- `.kavach/attack-surface/deep-probe-summary.md` - append the probe-summary content for this
+- `.kavach/attack-surface/probe-summary.md` - append the probe-summary content for this
   component under a `## Component: <name>` heading.
 
 VALIDATED hypotheses recorded here are the deep-probe hand-off the review chamber consumes -
 `kavach-chamber` dispatches `kavach-tracer` to extend (not re-derive) this evidence, and
 `kavach-verifier` treats an unsupported VALIDATED as a rejected rationalization. Nothing in
-`deep-probe-summary.md` is a finding yet; a finding only exists once the chamber promotes a
+`probe-summary.md` is a finding yet; a finding only exists once the chamber promotes a
 validated hypothesis with a real CVSS vector into `.kavach/findings-draft/`.
 
 ---

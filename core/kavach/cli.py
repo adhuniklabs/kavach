@@ -599,7 +599,7 @@ def cmd_inventory(args) -> int:
             "severity": meta.get("severity", ""),
             "has_report": os.path.exists(os.path.join(path, "report.md")),
         })
-    dest = _write_text(os.path.join(out, "attack-surface", "confirm-findings-inventory.json"),
+    dest = _write_text(os.path.join(out, "attack-surface", "live-inventory.json"),
                        json.dumps({"count": len(entries), "findings": entries}, indent=2))
     _log(f"KAVACH inventory → {len(entries)} finding dir(s) → {os.path.relpath(dest, out)}")
     return 0

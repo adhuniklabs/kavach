@@ -138,14 +138,14 @@ class TestBalancedModeSmoke(unittest.TestCase):
             dump_findings([stub], dispatch.result_path(self.dir, "hunt", name, index=i))
         self.assertNotIn("hunt", runner.next_actionable(self.dir, "balanced"))
 
-        kb.write_section(self.dir, "deep-probe-summary.md", "Manual Attack Surface", "Stubbed.")
+        kb.write_section(self.dir, "probe-summary.md", "Manual Attack Surface", "Stubbed.")
         self.assertNotIn("probe", runner.next_actionable(self.dir, "balanced"))
 
-        kb.write_section(self.dir, "deep-chamber-summary.md", "Chamber Summary",
+        kb.write_section(self.dir, "chamber-summary.md", "Chamber Summary",
                          "Stubbed - no false positives found.")
         self.assertNotIn("chamber", runner.next_actionable(self.dir, "balanced"))
 
-        _json_artifact(self.dir, "confirm-intent-crosscheck.json", {"findings": []})
+        _json_artifact(self.dir, "intent-crosscheck.json", {"findings": []})
         self.assertNotIn("crosscheck", runner.next_actionable(self.dir, "balanced"))
 
         # poc/report (PoC + report drafting) each gate on their own coverage artifact, so

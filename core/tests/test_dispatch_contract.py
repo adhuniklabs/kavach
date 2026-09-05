@@ -75,7 +75,7 @@ class TestPhaseSpecs(unittest.TestCase):
         provision wrote for it."""
         self.assertIn("reports/final-audit-report.md", modes.inputs_for("deep", "exploit"))
         got = modes.inputs_for("deep", "exploit", live=True)
-        self.assertEqual(got[-1], "attack-surface/confirm-env-connection.json")
+        self.assertEqual(got[-1], "attack-surface/env-connection.json")
         self.assertNotIn("reports/final-audit-report.md", got)
 
 
@@ -113,12 +113,12 @@ class TestPhasePrompt(unittest.TestCase):
         """The flag has to survive phase_prompt -> _existing_inputs -> inputs_for, or
         the tail agent is told to read the report instead of its own prereq."""
         os.makedirs(os.path.join(self.dir, "attack-surface"))
-        with open(os.path.join(self.dir, "attack-surface", "confirm-env-connection.json"),
+        with open(os.path.join(self.dir, "attack-surface", "env-connection.json"),
                   "w", encoding="utf-8") as fh:
             fh.write("{}")
         p = dispatch.phase_prompt("deep", "exploit", self.dir, "/repo", live=True)
         inputs = p.split("Audit inputs:")[1].split("---")[0]
-        self.assertIn("confirm-env-connection.json", inputs)
+        self.assertIn("env-connection.json", inputs)
 
     def test_only_inputs_that_exist_are_named(self):
         p = dispatch.phase_prompt("balanced", "kb", self.dir, "/repo")

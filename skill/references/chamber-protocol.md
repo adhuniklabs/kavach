@@ -36,7 +36,7 @@ Once the knowledge base and static-analysis triage are in place:
 1. Read `attack-surface/knowledge-base-report.md` for its DFD/CFD-equivalent high-risk slices and
    the `## Domain Attack Research` section; read `attack-surface/authz-matrix.md` and
    `attack-surface/unauthenticated-surface.md` if they exist.
-2. Read `attack-surface/manual-attack-surface-inventory.md` or `attack-surface/deep-probe-summary.md`
+2. Read `attack-surface/manual-attack-surface-inventory.md` or `attack-surface/probe-summary.md`
    (whichever exists) for pre-validated hypotheses from `kavach-probe` - see the handoff note below.
 3. Group slices by shared trust boundary or component affinity (slices touching the same data
    store, enforcement point, or transport layer belong together). Each cluster becomes one chamber.
