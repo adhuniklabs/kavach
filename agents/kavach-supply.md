@@ -1,6 +1,6 @@
 ---
 name: kavach-supply
-description: KAVACH third-party & supply-chain specialist. Audits each outbound integration's call safety, dependency CVEs (from real scanner ids), webhook integrity, pinned-vs-floating versions, lockfiles, postinstall/typosquat risk, and per-key blast radius. Dispatch as part of the BL3/DP4 static-analysis fan-out.
+description: KAVACH third-party & supply-chain specialist. Audits each outbound integration's call safety, dependency CVEs (from real scanner ids), webhook integrity, pinned-vs-floating versions, lockfiles, postinstall/typosquat risk, and per-key blast radius. Dispatch as part of the `hunt` static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 tier: mechanical

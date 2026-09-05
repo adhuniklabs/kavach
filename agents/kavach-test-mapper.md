@@ -1,6 +1,6 @@
 ---
 name: kavach-test-mapper
-description: KAVACH confirm-mode test-based verification agent. Verifies findings kavach-poc-executor could not confirm live (or that had no runnable PoC at all, including theoretical findings) by generating a minimal inverted-assertion reproducer test in the target's own test framework, running it in isolation with double-timeout discipline (install timeout + outer runner timeout + per-test hard cap) so a malicious payload can never hang the pipeline, and recording confirm_status. Use only when the operator has explicitly invoked KAVACH confirm mode (--live); when the generated test would send traffic to the live sandboxed app it states what it is about to run and waits for operator go-ahead exactly like kavach-poc-executor.
+description: KAVACH live-validation test-based verification agent. Verifies findings kavach-poc-executor could not confirm live (or that had no runnable PoC at all, including theoretical findings) by generating a minimal inverted-assertion reproducer test in the target's own test framework, running it in isolation with double-timeout discipline (install timeout + outer runner timeout + per-test hard cap) so a malicious payload can never hang the pipeline, and recording confirm_status. Use only when the operator has explicitly passed --live; when the generated test would send traffic to the live sandboxed app it states what it is about to run and waits for operator go-ahead exactly like kavach-poc-executor.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 tier: mechanical
@@ -11,7 +11,7 @@ color: blue
 
 ## Live validation charter - read this before anything else
 
-- **Confirm-mode gate.** You generate and run nothing unless the operator explicitly opted in with
+- **Live-validation gate.** You generate and run nothing unless the operator explicitly opted in with
   `--live` for this run. If dispatched without that opt-in on record, refuse and report why.
 - **Isolated sandbox only, never production.** Whenever the generated test will send a request to a
   live `base_url` (mode `fallback` - a PoC already ran against a provisioned app), that target is the
@@ -272,7 +272,7 @@ with a value only, never a sentence pointing at another file. Never touch any ot
 
 ## Gate artifact
 
-CF5's gate is `.kavach/attack-surface/test-mapping.json` - durable, one row per finding:
+`testgen`'s gate is `.kavach/attack-surface/test-mapping.json` - durable, one row per finding:
 display id, the framework chosen, the generated test's path, the run verdict, and the timestamp.
 
 ```json

@@ -6,7 +6,7 @@
   <img alt="version" src="https://img.shields.io/badge/version-0.1.0-c9a227">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="python" src="https://img.shields.io/badge/python-3.9%2B-3776ab">
-  <img alt="tests" src="https://img.shields.io/badge/tests-518%20passing-2c8f52">
+  <img alt="tests" src="https://img.shields.io/badge/tests-653%20passing-2c8f52">
   <img alt="model" src="https://img.shields.io/badge/model-agnostic-5f4fce">
 </p>
 
@@ -32,8 +32,9 @@ Then in Claude Code, at any repo root:
 
 ```
 /kavach              # balanced - the default full audit
-/kavach deep         # + chamber, cold re-verification, variants
+/kavach deep         # + patch history, authz/state/spec, cold re-verification, variants
 /kavach lite         # fast triage, minutes
+/kavach deep --live  # + sandboxed PoC execution against a running instance (opt-in)
 ```
 
 **Needs** `python3` + `pip` (pulls `PyYAML`, `filelock`). **Docker** unlocks the full scanner suite -
@@ -70,14 +71,15 @@ The Python core is a **planner, state manager, and renderer - it never talks to 
 `skill/SKILL.md` is the only thing that issues `Task` calls. That seam is what keeps KAVACH
 model-agnostic and makes every run resumable.
 
-| Mode | Use it for |
-|---|---|
-| `lite` | fast triage - a signal in minutes |
-| `balanced` | **default.** Knowledge base, 8 domain hunters, one chamber pass, PoCs, report |
-| `deep` | adds authz/state/spec specialists, multi-agent chamber, cold re-verification, variants |
-| `diff` | PR-scoped re-audit against a prior baseline commit |
-| `confirm` | opt-in live PoC validation in a sandbox (`--live`, strict rails) |
-| `revisit` · `merge` · `longshot` | re-audit with known findings held out · consolidate 2+ audits · per-file hail-mary sweep |
+One 26-phase pipeline; a preset is a subset of it, and the three nest -
+`lite ⊂ balanced ⊂ deep`.
+
+| Mode | Phases | Use it for |
+|---|---|---|
+| `lite` | 6 | fast triage - a signal in minutes: recon, secret sweep, one hunter, PoCs, report |
+| `balanced` | 13 | **default.** Knowledge base, 8 domain hunters, probe, one chamber pass, intent cross-check, PoCs, per-finding reports |
+| `deep` | 20 | adds patch history, authz/state/spec specialists, cross-service taint, cold re-verification, variant search |
+| `--live` | +6 | a flag, not a preset: opt-in sandboxed PoC execution appended to any of the three, ending in a confirmation report |
 
 See [`docs/modes.md`](./docs/modes.md) and [`docs/phase-reference.md`](./docs/phase-reference.md).
 
@@ -91,10 +93,10 @@ Every finding gets a **class**: `reasoned` (an agent judged it), `code`, `secret
 `iac`. Promotion keys on class *and* severity - so a CVE row and a cold-verified IDOR stop getting
 identical treatment, and 141 CVEs stop becoming 141 hand-written exploit narratives.
 
-Each audit also spends against a **dispatch ledger** (per-mode default; `--budget N`, `0` for
-unlimited). Anything a ceiling drops is printed in the report's *Limits of this run* section,
-alongside every promoted finding with no PoC and everything still marked `suspected`. A
-budget-constrained audit reads as one.
+Each audit also spends against a **dispatch ledger** (lite 15 · balanced 60 · deep 120, `--live`
+adding 30; `--budget N`, `0` for unlimited). Anything a ceiling drops is printed in the report's
+*Limits of this run* section, alongside every promoted finding with no PoC and everything still
+marked `suspected`. A budget-constrained audit reads as one.
 
 ## The core, standalone
 
@@ -116,10 +118,10 @@ verb, so nothing has to be re-read out of `SKILL.md` prose:
 
 ```bash
 kavach plan --mode balanced --json --target .    # roster, indices, result paths, gates
-kavach phase-prompt BL3 --mode balanced --target . --agent kavach-sast --index 1
-kavach slice BL3 --agent kavach-sast --index 1   # that domain's leads, not all 300 rows
+kavach phase-prompt hunt --mode balanced --target . --agent kavach-sast --index 1
+kavach slice hunt --agent kavach-sast --index 1  # that domain's leads, not all 300 rows
 kavach agents --json                             # tools + tier per agent (reasoning|mechanical|triage)
-kavach budget charge --phase BL3 -n 8 --cost-usd 0.42   # spend, if your harness measures it
+kavach budget charge --phase hunt -n 8 --cost-usd 0.42  # spend, if your harness measures it
 kavach events                                    # the run log, one JSON object per line
 ```
 

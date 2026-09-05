@@ -1,8 +1,8 @@
 # KAVACH Architecture - data flow
 
-A KAVACH audit is one data flow, regardless of mode. Modes differ in which agents
-run at which stage and how many passes the middle stages take (see `docs/modes.md` for the
-per-mode tradeoff and `docs/phase-reference.md` for the exact phases); the shape below is constant.
+A KAVACH audit is one data flow, regardless of preset. Presets differ only in which phases of the
+one pipeline run, and so in which agents reach each stage (see `docs/modes.md` for the tradeoff and
+`docs/phase-reference.md` for the exact phases); the shape below is constant.
 
 ```
 recon ──▶ sweep ──▶ drafts ──▶ chamber ──▶ triage ──▶ promote ──▶ report
@@ -33,19 +33,20 @@ the manifest as unclassified, not silently dropped.
 the rest of the built-in scanners - against the whole tree, deduplicates hits, and writes `sweep-summary.json`
 (per-scanner ok/unavailable/error) plus a first cut of `findings.json`. Every scanner hit here is a
 **lead**, never a verdict - nothing in `findings.json` at this stage is `confirmed` until a later
-agent reads the actual line. Where deep modes need more than a single detection pass - patch
+agent reads the actual line. Where `deep` needs more than a single detection pass - patch
 history, authz matrices, state/concurrency, spec-gap analysis - those specialist agents run in
 parallel with or after sweep and write their own `attack-surface/*.md` artifacts, but the mechanism
 is the same: deterministic-or-scripted signal in, `findings.json`/`attack-surface/` out.
 
 ## 3. Drafts - domain hunters produce per-finding units
 
-The 8 domain hunters (sast, api, llm, billing, crypto, supply, config, logic) - and in deep mode,
-the probe team and specialist agents - fan out against the attack surface recon+sweep built. Each
-confirms or refutes its slice of scanner leads at the actual sink, hunts what scanners structurally
-can't reason about (reachability, intent, business logic), and emits both a machine handoff at the
-engine-named `runs/<phase>/<agent>[-<index>].json` and, via `dispatch.ingest`, a per-finding draft
-under `findings-draft/<phase>-NNN-<slug>.md`. The engine names that result path in the dispatch
+The 8 domain hunters (sast, api, llm, billing, crypto, supply, config, logic) at `hunt` - joined
+from `balanced` up by the probe team, and under `deep` by the authz/state/spec/cross-service
+specialists - fan out against the attack surface recon+sweep built. (`lite` cuts `hunt`'s roster to
+`kavach-sast` alone.) Each confirms or refutes its slice of scanner leads at the actual sink, hunts
+what scanners structurally can't reason about (reachability, intent, business logic), and emits both
+a machine handoff at the engine-named `runs/<phase>/<agent>[-<index>].json` and, via
+`dispatch.ingest`, a per-finding draft under `findings-draft/<phase>-NNN-<slug>.md`. The engine names that result path in the dispatch
 prompt precisely so a fan-out cannot invent filenames or clobber itself. This is the stage where "a scanner found something"
 becomes "VAJRA confirmed this at file:line" or "flagged as suspected, here's the runtime test that
 would confirm it" - the confirmed/suspected discipline is enforced here, not retrofitted later.
@@ -56,11 +57,12 @@ Every draft goes through an adversarial-review pass before it's allowed to becom
 finding: `kavach-chamber` (the judge) orchestrates `kavach-ideator` (creative attack-mode
 hypotheses), `kavach-tracer` (reachability evidence), and `kavach-advocate` (the devil's-advocate
 false-positive hunt), with `kavach-variant-scout` running in the background to front-load variant
-discovery. Deep mode runs this as a full multi-agent debate at DP10; balanced runs a single-pass
-chamber at BL5; other modes reuse the same chamber agent at whatever intensity their phase calls
-for. Survivors get zero-context re-verification by `kavach-verifier` in deep mode (DP11) - a cold
-read with no access to the chamber's reasoning, specifically to catch anchoring. This stage writes
-to `tmp/chamber-workspace/` (transient) and is where a finding's severity gets calibrated, not just
+discovery. `chamber` is one phase with one gate whichever preset scheduled it - what differs is how
+much attack surface is underneath it, since `deep` reaches it with `authz`, `state`, `spec`,
+`crossservice` and `history` already done. Survivors get zero-context re-verification by
+`kavach-verifier` at `verify`, which only `deep` schedules - a cold read with no access to the
+chamber's reasoning, specifically to catch anchoring. This stage writes to
+`tmp/chamber-workspace/` (transient) and is where a finding's severity gets calibrated, not just
 proposed.
 
 ## 4b. Triage - a scanner row is not a finding
@@ -80,8 +82,8 @@ and under a source-only rule a committed credential would have been rolled into 
 aggregate and missed by the tracker export's redaction guard.
 
 Two live rewriters mutate `Finding.source` before this point - `sweep.dedupe` joins them with `+` on
-every scan, and merge mode prefixes an alias - so `classify` matches on **any segment** of the
-source rather than the whole string. `triage.sources()` is the one place that rule is written down.
+every scan, and `merge-run` prefixes a per-source alias - so `classify` matches on **any segment**
+of the source rather than the whole string. `triage.sources()` is the one place that rule is written down.
 
 ## 5. Promote - the findings tree
 
@@ -129,11 +131,11 @@ most important honesty property of the design.
 VAJRA still fills all 6 kill chains leaf-by-leaf in `attack-surface/kill-chains.md`, writes
 `controls.json` fail-closed, and renders the GRANTED/WITHHELD certification block - `score.py`'s gate and exit-code contract (`0` clean, `2`
 open Critical, `3` open High, `4` gate/controls unmet, `5` tooling error, `130` interrupt) reads
-`controls.json` and the findings tree, unchanged across every mode. Confirm mode adds
-`confirmation-report.md` as a parallel deliverable (9-state per-finding verdicts against a live
-environment) rather than replacing the static report. The mode's cleanup phase then removes every
-transient artifact (`tmp/`, `findings-draft/`, workspace dirs) and writes a
-`<mode>-cleanup-summary.json`, leaving only the durable tree described in
+`controls.json` and the findings tree, unchanged across every preset. `--live` adds `certify`, whose
+`confirmation-report.md` (9-state per-finding verdicts against a live environment) is a parallel
+deliverable rather than a replacement for the static report. The `cleanup` phase every preset ends
+on then removes every transient artifact (`tmp/`, `findings-draft/`, `live-workspace/`) and writes
+`attack-surface/cleanup-summary.json`, leaving only the durable tree described in
 `docs/output-structure.md`.
 
 ## Cross-cutting: the engine/skill seam
@@ -143,7 +145,8 @@ None of these stages runs as engine-spawned code. At every stage boundary the Py
 prompt, and folds results back in - while `SKILL.md` is the only thing that ever issues a `Task`
 call to actually run a sub-agent. See `docs/orchestration.md` for the plan → phase-prompt → Task →
 ingest → consolidate loop that drives every one of these stages, and `docs/phase-reference.md`
-for exactly which phase id and which agent sits at each point in the flow for each of the 8 modes.
+for exactly which phase id and which agent sits at each point in the flow, and which of the three
+presets schedules it.
 
 ## Source of truth
 

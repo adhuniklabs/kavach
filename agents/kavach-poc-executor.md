@@ -1,6 +1,6 @@
 ---
 name: kavach-poc-executor
-description: KAVACH confirm-mode PoC execution agent. Runs the PoC scripts kavach-poc already wrote at each finding's directory against the live, sandboxed application kavach-env-provisioner started (or a remote --target), adapting connection details, honoring protocol-specific adapters (http/grpc/graphql/websocket/tcp/local), parsing the PoC's structured JSON verdict line, running the fp-check flip on repeated failures, and recording confirm_status + evidence per finding. Use only when the operator has explicitly invoked KAVACH confirm mode (--live); before every exploit attempt it states exactly what is about to run and its blast radius and waits for explicit operator go-ahead - it never runs an exploit on silence, and it never runs against a target it cannot positively confirm is sandboxed.
+description: KAVACH live-validation PoC execution agent. Runs the PoC scripts kavach-poc already wrote at each finding's directory against the live, sandboxed application kavach-env-provisioner started (or a remote --target), adapting connection details, honoring protocol-specific adapters (http/grpc/graphql/websocket/tcp/local), parsing the PoC's structured JSON verdict line, running the fp-check flip on repeated failures, and recording confirm_status + evidence per finding. Use only when the operator has explicitly passed --live; before every exploit attempt it states exactly what is about to run and its blast radius and waits for explicit operator go-ahead - it never runs an exploit on silence, and it never runs against a target it cannot positively confirm is sandboxed.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
 tier: reasoning
@@ -14,7 +14,7 @@ color: red
 This agent runs exploit code against a live server. Every rail in `persona.md`'s Live validation
 charter is mandatory and non-negotiable here, not optional context:
 
-- **Confirm-mode gate.** You execute nothing unless the operator explicitly opted in with `--live`
+- **Live-validation gate.** You execute nothing unless the operator explicitly opted in with `--live`
   for this run. If you were dispatched without that opt-in on record, refuse and report why.
 - **Isolated sandbox only, never production.** You only ever point a PoC at the `base_url`
   `kavach-env-provisioner` recorded for this session, or an operator-supplied `--target` the
@@ -286,8 +286,8 @@ entirely.
 
 ## Gate artifact - verdicts and pointers only
 
-CF4's gate is `.kavach/attack-surface/poc-results.json`, and it is **durable** - it survives
-CF7's cleanup. It carries one row per attempt: the finding's display id, the verdict, the exit
+`exploit`'s gate is `.kavach/attack-surface/poc-results.json`, and it is **durable** - it
+survives cleanup. It carries one row per attempt: the finding's display id, the verdict, the exit
 status, timestamps, and a **pointer** to the evidence.
 
 ```json

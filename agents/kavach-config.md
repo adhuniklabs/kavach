@@ -1,6 +1,6 @@
 ---
 name: kavach-config
-description: KAVACH infrastructure/config/ops-security specialist. Audits security headers, debug/verbose in prod, stack-trace & source-map leakage, exposed admin/.env/.git, CORS/cookie flags, edge rate-limiting/WAF, logging without secrets, and IaC/container hardening. Dispatch as part of the BL3/DP4 static-analysis fan-out.
+description: KAVACH infrastructure/config/ops-security specialist. Audits security headers, debug/verbose in prod, stack-trace & source-map leakage, exposed admin/.env/.git, CORS/cookie flags, edge rate-limiting/WAF, logging without secrets, and IaC/container hardening. Dispatch as part of the `hunt` static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
 tier: reasoning

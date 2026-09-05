@@ -194,6 +194,6 @@ decisive evidence in one clause, and the path to your full review:
 | H3 | confirmed | HIGH (CVSS 7.5) | no tenant check in `src/orders.py:88` | `tmp/verifier-reviews/h3-review.md` |
 ```
 
-That file is DP11's gate artifact. Your per-finding review lives under `tmp/`, which cleanup
+That file is `verify`'s gate artifact. Your per-finding review lives under `tmp/`, which cleanup
 deletes - if the gate lived there too, every resume would re-run the entire cold-verification pass.
 Append, never overwrite: a fan-out writes several dispatches into one roll-up.

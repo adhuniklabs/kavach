@@ -15,7 +15,7 @@ cleanly down one seam:
   result back to the engine to fold in.
 
 **The engine owns the whole dispatch contract, not half of it.** It used to compose a one-line body
-(`"Execute phase BL3 (Static Analysis & Triage)."`) and leave the real instruction - which
+(`"Execute phase hunt (Static Analysis & Triage)."`) and leave the real instruction - which
 references to load, which agents fan out, what the phase must produce - in `SKILL.md` prose. That
 made `SKILL.md` the spec rather than a client of it: every other harness had to re-read the prose
 and re-encode it, and drift from it silently. `modes.PHASE_SPECS` now holds the task, the reference
@@ -31,18 +31,18 @@ model-agnostic and host-native - the engine doesn't care which model is running 
 
 One phase, start to finish, looks like this:
 
-1. **Plan.** `SKILL.md` asks the engine what's actionable: `kavach plan --mode <mode>` (or the
-   equivalent `runner.next_actionable(audit_dir, mode)` call) returns the phase ids whose prereqs
-   are complete/skipped and whose gate artifact doesn't exist yet, in mode order. `runner.
-   ensure_prereqs()` is the safety check behind `--only` - it raises `PrereqError` rather than let a
-   phase run out of order.
+1. **Plan.** `SKILL.md` asks the engine what's actionable: `kavach plan --mode <mode> [--live]` (or
+   the equivalent `runner.next_actionable(audit_dir, mode, live)` call) returns the phase ids whose
+   prereqs are complete/skipped and whose gate artifact doesn't exist yet, in pipeline order.
+   `runner.ensure_prereqs(audit_dir, mode, phase, live)` is the guard for a driver that wants to run
+   one named phase out of band - it raises `PrereqError` rather than let a phase run out of order.
 2. **Budget check.** Before any fan-out, the skill asks the ledger how much of what it planned it
    may actually spend: `kavach budget check --phase <id> --planned N` returns
    `{allowed, dropped, reason}` and **records the shed itself**, at decision time. It exits `7` when
    `allowed < planned`, so the skill can branch in bash. The skill dispatches `allowed`, never
    `planned`. See "The dispatch ledger" below.
 3. **Phase-prompt.** For each actionable phase, the harness asks the engine to compose the sub-agent
-   prompt: `kavach phase-prompt <phase> --mode <mode> --target <path> [--agent A] [--index i]`
+   prompt: `kavach phase-prompt <phase> --mode <mode> [--live] --target <path> [--agent A] [--index i]`
    (backed by `dispatch.phase_prompt`) returns a **complete, dispatchable prompt** - a runtime header -
    target repo root, audit dir, state file path, mode/phase + label, the output paths this phase is
    expected to write, **the exact absolute path this sub-agent must write its machine result to**
@@ -57,9 +57,10 @@ One phase, start to finish, looks like this:
    told to write the same file and clobber each other. The engine cannot detect that for the skill,
    so the contract is "one distinct `--index` per dispatch, 1-based."
 
-   `kavach plan --mode <mode> --json --target <path>` returns the same for every actionable phase at
-   once - roster, per-dispatch index, result path, references, gate artifacts, and whether the roster
-   is sequential. A scripted driver needs nothing from `modes.py` and nothing from this document.
+   `kavach plan --mode <mode> [--live] --json --target <path>` returns the same for every actionable
+   phase at once - roster, per-dispatch index, result path, references, resolved prereqs, gate
+   artifacts, and whether the roster is sequential. A scripted driver needs nothing from `modes.py`
+   and nothing from this document.
 
    `kavach agents [--json]` is the roster as data: each agent's tools, its `model:` (what Claude Code
    reads) and its `tier:` - `reasoning` / `mechanical` / `triage`, the same decision spelled so a
@@ -67,7 +68,7 @@ One phase, start to finish, looks like this:
 
    `kavach slice <phase> --agent <name> --index <i>` cuts that domain's leads out of `findings.json`
    into `runs/<phase>/slices/<agent>-<i>.json`, with a count of what was left to other domains. The
-   eight BL3/DP4 hunters were each being sent the whole finding set, so a 300-row sweep was paid for
+   eight `hunt` hunters were each being sent the whole finding set, so a 300-row sweep was paid for
    eight times; the slice also tells the hunter what it did *not* see, because one that believes its
    slice is the whole set reports coverage it does not have.
 4. **Task.** `SKILL.md` issues the actual `Task` call(s) - batches of at most `KAVACH_MAX_AGENTS`
@@ -90,8 +91,8 @@ One phase, start to finish, looks like this:
 8. **Coverage.** After a per-finding batch (PoC or report drafting), `kavach coverage --phase
    poc|report` walks the promoted tree and writes `attack-surface/{poc,report}-coverage.json`,
    naming every directory still missing its artifact. Exit `0` complete, `7` incomplete. **These
-   artifacts are the gates** for the seven per-finding phases, so this runs after every batch, not
-   once at the end.
+   artifacts are the gates** for the two per-finding phases, `poc` and `report`, so this runs after
+   every batch, not once at the end.
 9. **Gate.** The engine re-checks: does the phase's gate artifact now exist - and, for the report
    phases, is it over 500 bytes; for a coverage artifact, does it say `complete: true`? If yes, the
    phase is complete - gate-driven, not state-driven. `audit-state.json` is a cache of this fact,
@@ -99,9 +100,13 @@ One phase, start to finish, looks like this:
 10. **Repeat** until no phase is actionable - either everything gated complete, or something's
     blocked/failed and needs a retry or a human look.
 
-The skill never invents this loop per-mode; it is the same steps for every one of the 8 modes. What
-changes per mode is only which phases exist and what their prereqs/gates are
-(`docs/phase-reference.md`).
+The skill never invents this loop per-mode; it is the same steps for all three presets and for the
+`--live` tail. There is one 26-phase pipeline with one id namespace, and a preset is a subset of it -
+so what changes is only *which* phases the planner offers, never what a phase id means, what it
+reads, or what closes it (`docs/phase-reference.md`). Prerequisites are declared once against the
+whole pipeline; a preset takes the induced subgraph, with an edge into a dropped phase rerouted onto
+that phase's own prereqs, transitively. `runner.next_actionable(audit_dir, mode, live)` is the only
+place that resolution happens.
 
 ## The dispatch ledger
 
@@ -113,10 +118,12 @@ do.
 The ledger lives inside the audit's own record in `audit-state.json` under a `budget` key, so it
 survives resume, inherits the state filelock, and needs no second file:
 
-- `kavach state init --budget N --max-wall-seconds S` seeds it. Defaults are per mode (lite 15,
-  balanced 60, deep 120, diff 10, confirm 30, revisit 80, merge 20, longshot 40) and 3 hours of wall
-  clock. `0` means **unlimited** - distinct from exhausted, which allows 0 with reason
-  `"dispatch ceiling"`. Both mirror to `KAVACH_MAX_DISPATCHES` / `KAVACH_MAX_WALL_SECONDS`.
+- `kavach state init --budget N --max-wall-seconds S` seeds it. Defaults are per preset (lite 15,
+  balanced 60, deep 120), plus `LIVE_DELTA` **30** when `--live` appends the live tail, and 3 hours
+  of wall clock. The live delta is added rather than substituted, because live validation provisions
+  an environment and executes per finding - a cost that is orthogonal to audit depth. `0` means
+  **unlimited** - distinct from exhausted, which allows 0 with reason `"dispatch ceiling"`. Both
+  mirror to `KAVACH_MAX_DISPATCHES` / `KAVACH_MAX_WALL_SECONDS`.
 - `check` decides and records; `charge` accounts. Both take the state filelock.
 - Wall clock is evaluated **before** the dispatch ceiling. `allowed: 0` with reason `"wall clock"`
   is how a long run degrades gracefully: the skill stops fanning out, finishes the report from what

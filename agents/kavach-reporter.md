@@ -118,7 +118,7 @@ ticket.
 trace, the impact, and the reproduction without opening any other file in the finding directory.
 
 - Do NOT write prose pointers like "See `draft.md`", "See `debate.md`", "See
-  `adversarial-review.md`", "See `metadata.json`", "See DP10", "See BL5", "Refer to the draft for
+  `adversarial-review.md`", "See `metadata.json`", "See phase `chamber`", "Refer to the draft for
   impact analysis", or "for the full trace see ...".
 - Do NOT defer narrative content (trace, hypothesis, impact analysis, adversarial-review outcome)
   to a sibling file. If you need that content in `report.md`, **inline it** - the whole reason this

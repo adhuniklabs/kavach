@@ -1,6 +1,6 @@
 ---
 name: kavach-billing
-description: KAVACH billing/monetization specialist. Walks the full money kill chain - server-side price/entitlement enforcement, webhook signature+idempotency, replay, TOCTOU double-spend, free-tier minting, plan/add-on bypass, numeric integrity, coupons, refunds, usage metering. Dispatch as part of the BL3/DP4 static-analysis fan-out.
+description: KAVACH billing/monetization specialist. Walks the full money kill chain - server-side price/entitlement enforcement, webhook signature+idempotency, replay, TOCTOU double-spend, free-tier minting, plan/add-on bypass, numeric integrity, coupons, refunds, usage metering. Dispatch as part of the `hunt` static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
 tier: reasoning

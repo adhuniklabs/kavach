@@ -4,7 +4,7 @@
 
   "id": "security",
   "name": "KAVACH Security Audit",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Zero-input adversarial security audit — VAPT-grade, fail-closed.",
   "author": { "name": "Adhunik Labs", "url": "https://github.com/adhuniklabs" },
   "license": "MIT",
@@ -16,12 +16,9 @@
   "agents": "./agents",
   "references": "./skill/references",
   "modes": [
-    { "id": "lite", "label": "Fast triage — secrets, SAST, PoC", "default": false },
+    { "id": "lite", "label": "Fast triage — secrets, SAST, PoC, report", "default": false },
     { "id": "balanced", "label": "Full audit — 8 hunters, chamber, report", "default": true },
-    { "id": "deep", "label": "Adversarial — authz, state, cold re-verification", "default": false },
-    { "id": "diff", "label": "Only what changed since the last audit", "default": false },
-    { "id": "longshot", "label": "Hail-Mary hunt — per-file, on the anchors nothing else reached", "default": false },
-    { "id": "revisit", "label": "Re-audit — fresh probe and cold verification over a finished audit", "default": false }
+    { "id": "deep", "label": "Adversarial — authz, state, cold re-verification", "default": false }
   ],
 
   "engine": {
@@ -35,7 +32,7 @@
     "python": ">=3.9",
     "commands": [
       { "name": "docker", "level": "degrades", "why": "11 of 14 scanners; the builtin secrets and offline SAST rules still run" },
-      { "name": "git", "level": "degrades", "why": "the baseline snapshot, and diff mode" },
+      { "name": "git", "level": "degrades", "why": "the baseline snapshot, and the `kavach diff` verb" },
       { "name": "gh", "level": "optional", "why": "the opt-in issue export" }
     ],
     "inference": { "tiers": ["reasoning", "mechanical", "triage"] }

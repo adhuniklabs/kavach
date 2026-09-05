@@ -220,6 +220,10 @@ def _cover_commit(explicit: str, out: str) -> str:
 
 
 def cmd_render(args) -> int:
+    # `--mode` is only a cover label here, but a removed mode printed on page 1 of a signed report
+    # is a claim about how the audit was run. The empty default stays legal - `_check_mode` passes
+    # it through - so rendering without naming a mode is unaffected.
+    _check_mode(args.mode)
     out = _out_dir(args)
     if args.format == "pdf" and not args.output:
         _log("KAVACH render → --format pdf needs --output PATH (a PDF is bytes, not stdout)")
@@ -923,7 +927,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(sp); sp.add_argument("--extra", nargs="*", help="sub-agent result files")
     sp.set_defaults(func=cmd_merge)
 
-    sp = sub.add_parser("merge-run", help="drive merge-mode phases MG1/MG5/MG6 over source audit dirs")
+    sp = sub.add_parser("merge-run", help="fold 2+ source audit dirs into one renumbered finding set")
     add_common(sp)
     sp.add_argument("--dir", action="append", help="source audit dir; repeat for each source")
     sp.set_defaults(func=cmd_merge_run)
@@ -935,7 +939,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--controls", help="controls.json from reconciliation")
     sp.add_argument("--severity-only", action="store_true", help="gate on severity counts only")
     sp.add_argument("--date", default=""); sp.add_argument("--commit", default="")
-    sp.add_argument("--mode", default="", help="audit mode name, printed on the cover")
+    sp.add_argument("--mode", default="", help="preset name, printed on the cover; omit for none")
     sp.add_argument("--narrative", default=None,
                     help="JSON of the six render anchors; default reads "
                          "attack-surface/narrative.json")

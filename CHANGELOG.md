@@ -3,6 +3,125 @@
 All notable changes to Adhunik Kavach are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.3.0] - 2026-09-05
+
+Eight modes collapse into three intensity presets over one pipeline. This is a breaking release:
+phase ids changed, gate filenames changed, and five modes are gone. Finished audits are unaffected -
+`findings/` and `reports/` are exactly what they were. An **in-progress** audit dir is not: its
+`audit-state.json` records phase ids this engine no longer knows, gated on filenames nothing writes
+any more, so start a fresh audit dir rather than resuming one across this release.
+
+### Eight modes, six advertised, and nobody could tell which was which
+
+`karya-module.json` listed six modes. The engine had eight. `merge` and `confirm` were dispatchable
+from any harness that read the registry and named in no manifest, so which modes existed depended on
+which file you asked. Underneath, each mode carried its own hand-maintained phase list, its own
+prereq table and its own gate filenames - which is how `LT2`, `BL3`, `DP4`, `DF1` and `RV7` ended up
+being five ids for one job, closing between them on four different artifacts.
+
+There is now **one 26-phase `PIPELINE`** with one id namespace, and a mode is a subset of it:
+
+| Preset | Phases | Default dispatch ceiling |
+|---|---|---|
+| `lite` | 6 | 15 |
+| `balanced` | 13 | 60 |
+| `deep` | 20 | 120 |
+| `--live` | +6 | +30 on top of the preset |
+
+The three nest - `lite ⊂ balanced ⊂ deep` - so moving up a preset only ever adds phases, and a
+phase id means the same work, reads the same inputs and writes the same artifact whichever preset
+scheduled it. Prerequisites are declared once in `PREREQ_EDGES` against the whole pipeline; a preset
+takes the induced subgraph, rerouting an edge into a dropped phase onto that phase's own prereqs,
+transitively. Under `lite`, `poc`'s declared `crosscheck` resolves to `['recon', 'hunt']` that way -
+nothing unsatisfiable, and nothing running before its real inputs exist.
+
+`core/tests/test_manifest_modes.py` asserts the manifest's ids are exactly `modes.MODES` with
+`balanced` the only default, so the manifest and the registry cannot drift apart again.
+
+### Five modes removed, each naming its replacement
+
+| Removed | Replacement |
+|---|---|
+| `diff` | the `kavach diff` verb |
+| `confirm` | `--live` on any preset |
+| `revisit` | re-run any preset against the existing audit dir |
+| `merge` | the `kavach merge-run` verb |
+| `longshot` | removed |
+
+Passing one to a mode-taking verb exits non-zero with that replacement named, rather than reporting
+an unknown mode - a muscle-memory command deserves better than a shrug. `kavach render --mode` now
+runs the same check; it did not, so `kavach render --mode longshot` printed `longshot` on the cover
+of a signed report. Rendering with no `--mode` at all is unchanged and still prints no mode.
+
+Gone with them: the `kavach enumerate` verb, `KAVACH_LONGSHOT_LIMIT`, `kb.update_target_status`, and
+the `kavach-longshot-hunter`, `kavach-longshot-aggregator` and `kavach-wave` agents.
+
+### `--live` replaces confirm mode
+
+Live PoC validation was a mode, which made it a *choice against* depth: you could have `deep`, or
+you could have execution against a running instance, and getting both meant two audits over one
+tree. It is now a flag. `--live` appends six phases - `inventory`, `envscan`, `provision`,
+`exploit`, `testgen`, `certify` - to whichever preset is running, and adds `LIVE_DELTA` 30 to its
+ceiling, because provisioning an environment and executing per finding is a cost orthogonal to audit
+depth. Every rail is unchanged: static-only remains the permanent default, and the charter in
+`persona.md` still governs absolutely.
+
+Two consequences worth stating plainly:
+
+- **A plain `deep` run no longer writes `reports/confirmation-report.md`.** `certify` owns that
+  artifact and `certify` is a `--live` phase. Under 0.2.x `deep` ended on a `DP16` that wrote one
+  anyway - and a confirmation report is a claim about execution, which `deep` does none of.
+- **`cleanup` waits for the tail.** Its prereqs resolve to `render` and `certify` together under
+  `--live`, and to `render` alone without it, so the redaction pass is always last.
+
+`confirm-workspace/` is now `live-workspace/`, and it is still transient - `cleanup.TRANSIENT` is
+exactly `tmp/`, `findings-draft/` and `live-workspace/`.
+
+### Phase ids are semantic, and gate filenames lost their mode prefixes
+
+`BL3` is `hunt`. `DP12` is `variant`. `CF1_5` is `crosscheck`. An id now says what the phase does,
+and `runs/<phase>/` and `findings-draft/<phase>-NNN-<slug>.md` read as English.
+
+The gates moved with them. One phase shared by three presets cannot gate on a filename that varies
+with the preset, so the prefixes are gone: `deep-chamber-summary.md` and `balanced-chamber-summary.md`
+are one `chamber-summary.md`; `manual-attack-surface-inventory.md` and `deep-probe-summary.md` are
+one `probe-summary.md`; `lite-q2-summary.md` is `source-sink-flows-all-severities.md`; every
+`confirm-*` gate dropped its prefix; `<mode>-cleanup-summary.json` is `cleanup-summary.json`. The
+result is **26 phases and 26 distinct gate artifacts, one apiece** - no phase can be closed by
+another phase's output, which four `revisit` phases sharing a `findings/` gate used to allow.
+
+### `lite` produces a report
+
+`lite` now schedules `render`, so it ends in `reports/final-audit-report.md` instead of a bare
+findings tree - a fast triage pass that produced no readable deliverable was a strange thing to
+offer. It deliberately does **not** schedule `report`, the per-finding drafting phase: that costs
+one `kavach-reporter` dispatch per promoted finding, which is most of a 15-dispatch ceiling.
+
+### The prerequisite pre-flight is gone, along with the problem it reported
+
+`modes.missing_prerequisites()` and `PREREQ_ARTIFACTS` are removed, and `kavach plan --json` no
+longer emits a `"prerequisites"` key. They existed because `balanced`, `deep`, `diff`, `longshot`
+and `revisit` scheduled neither `recon` nor `sweep` while everything downstream read what those two
+write, so a harness had to know to run them by hand. Every preset now schedules both as phases of
+its own, and the pre-flight has nothing left to report.
+
+### The codegraph integration is removed
+
+`kavach graph`, `core/kavach/graphindex.py`, the `codegraph` entry in the manifest's `requires`, and
+the graph passages in `SKILL.md`, `docs/orchestration.md` and `README.md` are gone. It was optional
+from the day it shipped, every hunter already had a grep fallback, and 0.2.5 had to special-case its
+telemetry to stop it phoning home about a private repository. The one surviving mention is
+`recon.py`'s comment citing a real 23 MB `.codegraph/codegraph.db` as why dot-directories are
+skipped as a class - still true, and not about the integration.
+
+### Docs
+
+`docs/modes.md` and `docs/phase-reference.md` are rewritten from the registry rather than edited:
+one phase table with preset membership, one `PREREQ_EDGES` table, and the induced-subgraph rule with
+a worked example, replacing eight per-mode DAGs. `SKILL.md`'s frontmatter, mode parsing, live gate,
+fan-out list and reconciliation tail follow the same three presets, and every phase id named across
+`docs/`, `skill/` and `agents/` is re-keyed.
+
 ## [0.2.5] - 2026-08-25
 
 A patch, and it holds: an audit written by any 0.2.x still resumes here. No phase id, no prereq

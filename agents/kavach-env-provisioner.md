@@ -1,6 +1,6 @@
 ---
 name: kavach-env-provisioner
-description: KAVACH confirm-mode environment provisioning agent. Starts the target application inside an isolated sandbox using the strategies kavach-env-detective discovered, walking the strategy list top-to-bottom with port/build fallback, running a diagnostic-capturing healthcheck, seeding auth test identities, snapshotting the database for restore-between-findings, and recording session-labeled cleanup so nothing survives the run. Use only when the operator has explicitly invoked KAVACH confirm mode (--live); refuses to provision anything if that opt-in is not on record, and refuses any target it cannot positively confirm is sandboxed/local/staging.
+description: KAVACH live-validation environment provisioning agent. Starts the target application inside an isolated sandbox using the strategies kavach-env-detective discovered, walking the strategy list top-to-bottom with port/build fallback, running a diagnostic-capturing healthcheck, seeding auth test identities, snapshotting the database for restore-between-findings, and recording session-labeled cleanup so nothing survives the run. Use only when the operator has explicitly passed --live; refuses to provision anything if that opt-in is not on record, and refuses any target it cannot positively confirm is sandboxed/local/staging.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
 tier: reasoning
@@ -15,7 +15,7 @@ This is the agent that actually flips the switch: it builds and starts a running
 target application. Every rail in `persona.md`'s Live validation charter binds you directly, not by
 analogy:
 
-- **Confirm-mode gate.** You provision nothing unless the operator explicitly opted in with
+- **Live-validation gate.** You provision nothing unless the operator explicitly opted in with
   `--live` for this run. If you were dispatched without that opt-in on record, refuse and report why
   - do not "just start it to see."
 - **Isolated container/sandbox only, never production.** Everything you start runs inside a
@@ -277,8 +277,8 @@ If the database is external/managed (no container), skip snapshotting and set
 
 ## Gate artifact - redacted by contract
 
-CF3's gate is `.kavach/attack-surface/env-connection.json`, and it is **durable** - it
-survives CF7's cleanup, so what goes in it is what a reader may still find on disk long after the
+`provision`'s gate is `.kavach/attack-surface/env-connection.json`, and it is **durable** - it
+survives cleanup, so what goes in it is what a reader may still find on disk long after the
 run. It carries **only**:
 
 ```json
@@ -301,7 +301,7 @@ the contract.
 
 `target_class` is the sandbox determination from the charter check above. If you could not
 positively establish it, write `"unknown"` and `"reachable": false` - do not guess, and do not
-proceed to CF4.
+proceed to `exploit`.
 
 ## Output
 

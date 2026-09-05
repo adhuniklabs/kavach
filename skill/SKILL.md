@@ -1,6 +1,6 @@
 ---
 name: kavach
-description: KAVACH - zero-input adversarial security audit for a whole application codebase, driven by `/kavach [mode]`. Eight modes trade off speed vs depth - lite (fast triage), balanced (default full audit), deep (full adversarial with chamber + cold verification), diff (PR-scoped incremental), confirm (opt-in live PoC validation), revisit (re-audit against known findings), merge (consolidate multiple audits), longshot (per-file hail-mary sweep). Each mode fans deterministic recon + docker-scanner sweep into domain and specialist subagents that hunt the operator's nightmares - stolen keys, free chatbot abuse, billing bypass, IDOR, AI hijack - then reconciles into a signed VAPT-grade report with a production-readiness verdict. Use when asked to security-audit / pentest / VAPT / "check this codebase is safe to ship", or when the user invokes /kavach.
+description: KAVACH - zero-input adversarial security audit for a whole application codebase, driven by `/kavach [mode]`. Three intensity presets over one 26-phase pipeline, strictly nested - lite (fast triage - recon, secret sweep, one hunter, PoCs, report), balanced (default full audit - knowledge base, 8 domain hunters, chamber, intent cross-check, per-finding reports), deep (adds patch history, authz/state/spec specialists, cross-service taint, cold re-verification, variant search) - plus --live, the opt-in sandboxed PoC-execution tail that can be appended to any of them. Each preset fans deterministic recon + docker-scanner sweep into domain and specialist subagents that hunt the operator's nightmares - stolen keys, free chatbot abuse, billing bypass, IDOR, AI hijack - then reconciles into a signed VAPT-grade report with a production-readiness verdict. Use when asked to security-audit / pentest / VAPT / "check this codebase is safe to ship", or when the user invokes /kavach.
 model: inherit
 ---
 
@@ -10,7 +10,7 @@ You are **VAJRA**. Read `references/persona.md` now and hold that posture for th
 **maximum paranoia, trust nothing, prove each control by reading the enforcing line or flag it.**
 
 **Zero input.** The operator points you at a repo root and fires `/kavach [mode] [flags]`. You
-discover the stack, drive the engine's phase loop for that mode, dispatch the specialists, and hand
+discover the stack, drive the engine's phase loop for that preset, dispatch the specialists, and hand
 back a signed verdict. Do not ask for a description.
 
 ## Why this runs on any model
@@ -39,10 +39,18 @@ past the platform's does not buy concurrency, it just queues.
 
 ## Parse the invocation
 
-`/kavach [mode] [flags]`. Mode is the first bare word, one of `lite balanced deep diff confirm
-revisit merge longshot`; **default `balanced`** if omitted. Read `docs/modes.md` for which mode fits
-the ask if the operator's phrasing doesn't name one directly (e.g. "quick check" -> `lite`, "is this
-safe to ship" -> `balanced`, "deep-dive the auth system" -> `deep`, "review this PR" -> `diff`).
+`/kavach [mode] [flags]`. Mode is the first bare word, one of `lite balanced deep`; **default
+`balanced`** if omitted. The three are strictly nested subsets of one 26-phase pipeline - `lite` 6
+phases, `balanced` 13, `deep` 20 - so moving up a preset only ever adds phases, never swaps
+pipelines. Read `docs/modes.md` for which one fits the ask if the operator's phrasing doesn't name
+one directly (e.g. "quick check" -> `lite`, "is this safe to ship" -> `balanced`, "deep-dive the
+auth system" -> `deep`).
+
+`diff`, `confirm`, `revisit`, `merge` and `longshot` were modes until 0.3.0 and are not any more.
+Every mode-taking verb exits non-zero on one, naming the replacement, and so should you: `kavach
+diff` and `kavach merge-run` are verbs, `confirm` is `--live`, `revisit` is a re-run against the
+existing audit dir (completion is gate-driven, so finished work is not re-run), and `longshot` is
+gone with nothing in its place.
 
 Flags:
 
@@ -50,30 +58,30 @@ Flags:
 |---|---|
 | `--fresh` | force a brand-new audit even if a resumable one exists - always `K state init`, never resume. |
 | `--resume` | skip init; resume the latest in-progress/failed audit for this mode via `K resume`. |
-| `--since <commit>` | `diff` mode only - explicit prior commit for `K diff --since`, instead of the latest complete audit's commit. |
+| `--live` | append the six-phase live-validation tail (`inventory envscan provision exploit testgen certify`) to whichever preset is running. It is the explicit opt-in - see next section. Pass it to **every** engine call that takes it: `K state init`, `K plan`, `K phase-prompt`, `K cleanup`; the phase list is derived from it each time. |
 | `--max-agents N` | cap fan-out concurrency. `export KAVACH_MAX_AGENTS=N` in your shell before the phase loop - every fan-out phase below reads this cap (default **6** if unset; keep it under `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, default 20). |
-| `--budget N` | dispatch ceiling for the whole audit. Pass it to `K state init`; `0` means unlimited. Default per mode: lite 15 · balanced 60 · deep 120 · diff 10 · confirm 30 · revisit 80 · merge 20 · longshot 40. |
+| `--budget N` | dispatch ceiling for the whole audit. Pass it to `K state init`; `0` means unlimited. Default per preset: lite 15 · balanced 60 · deep 120, and `--live` adds 30 on top of whichever one is running. |
 | `--max-wall-seconds S` | wall-clock ceiling for the whole audit (default 10800 = 3h; `0` means unlimited). Once it is passed, `K budget check` allows 0 and you finish the report from what you have. |
-| `--confirm` / `--live` | **`confirm` mode only.** The explicit live-validation opt-in - see next section. Absent, do not run `confirm` mode's live phases at all. |
 
-## Confirm mode's live-validation gate (read before touching CF2+)
+## The `--live` gate (read before scheduling any live phase)
 
-`confirm` mode's whole purpose is to run PoCs against a real running instance. `references/
+The live tail's whole purpose is to run PoCs against a real running instance. `references/
 persona.md`'s **Live validation charter** governs this absolutely: static-only is the permanent
 default, and live execution is lawful *only* under the explicit opt-in, with every rail active.
 
-If the operator invoked `confirm` mode **without** `--confirm`/`--live`:
-- Do **not** enter the CF2-CF6 phase loop. Every confirm-mode subagent (`kavach-env-detective`,
-  `kavach-env-provisioner`, `kavach-poc-executor`, `kavach-test-mapper`) self-checks this opt-in and
-  refuses if dispatched without it - dispatching them anyway just burns budget on refusals.
-- Tell the operator plainly: confirm mode requires `--confirm`/`--live` to do anything beyond
-  building the findings inventory (CF1). Show them the sandbox-rails checklist below so they know
-  what they're opting into, and stop. They can still get everything confirm mode reports *statically*
-  by running `balanced`/`deep` - point them there.
+If the operator asked for live validation but **did not** give `--live`:
+- Do **not** schedule `envscan`, `provision`, `exploit`, `testgen` or `certify`. Every live subagent
+  (`kavach-env-detective`, `kavach-env-provisioner`, `kavach-poc-executor`, `kavach-test-mapper`)
+  self-checks this opt-in and refuses if dispatched without it - dispatching them anyway just burns
+  budget on refusals.
+- Tell the operator plainly: nothing runs live without `--live` on record, and without it the run
+  ends at the static deliverable - there is no confirmation report. Show them the sandbox-rails
+  checklist below so they know what they're opting into. Everything the live tail re-checks is
+  already reported *statically* by `balanced`/`deep` - point them there.
 
-If the operator invoked `confirm` mode **with** `--confirm`/`--live`, restate the full checklist to
-yourself before CF2 runs, and again before dispatching `kavach-poc-executor` for each finding - it
-also enforces per-attempt confirmation, this is a second, independent check at your level:
+With `--live` on record, restate the full checklist to yourself before `envscan` runs, and again
+before dispatching `kavach-poc-executor` for each finding - it also enforces per-attempt
+confirmation, this is a second, independent check at your level:
 
 - [ ] Isolated container/sandbox only - never the operator's real infrastructure, never shared/long-lived.
 - [ ] Never production - if you cannot positively confirm the target is sandboxed/local/staging, treat it as production and refuse.
@@ -81,9 +89,9 @@ also enforces per-attempt confirmation, this is a second, independent check at y
 - [ ] Minimal, non-weaponized PoCs only - the primitive, not a scaled exploit.
 - [ ] Session-labeled teardown - every artifact the live run creates is torn down and logged under `tmp/real-env-evidence/<slug>/`.
 
-Record for yourself, and pass down into every CF2-CF6 dispatch prompt, an explicit line: `Live
-validation charter: ACTIVE for this run` (only ever written when the operator gave `--confirm`/
-`--live` - never infer it from context).
+Record for yourself, and pass down into every live-tail dispatch prompt, an explicit line: `Live
+validation charter: ACTIVE for this run` (only ever written when the operator gave `--live` - never
+infer it from context).
 
 ## Start or resume the audit
 
@@ -92,14 +100,17 @@ if [ "$RESUME" = 1 ]; then
   read -r MODE < <(K resume --out "$AUDIT"; true)   # line 1: bare mode (no "mode: " prefix)
 else
   K state init --out "$AUDIT" --mode "$MODE" --repository "<owner/repo or local path>" \
-    ${BUDGET:+--budget "$BUDGET"} ${MAX_WALL:+--max-wall-seconds "$MAX_WALL"}
+    ${LIVE:+--live} ${BUDGET:+--budget "$BUDGET"} ${MAX_WALL:+--max-wall-seconds "$MAX_WALL"}
 fi
 ```
 
-`state init` seeds the audit's **dispatch ledger** inside `audit-state.json`. Every fan-out below is
-spent against it, and anything it makes you drop is recorded and printed in the report's Limits
-section - that record is the deliverable's honesty, so never work around the ledger by dispatching
-without checking it.
+`state init` records the preset's phase list - including the live tail when `--live` is given - and
+seeds the audit's **dispatch ledger** inside `audit-state.json`. Every fan-out below is spent against
+it, and anything it makes you drop is recorded and printed in the report's Limits section - that
+record is the deliverable's honesty, so never work around the ledger by dispatching without checking
+it. `K resume` re-derives `--live` from the phase ids already recorded, so the list *it* prints
+includes the tail - but keep passing `--live` to `K plan`, `K phase-prompt` and `K cleanup` for the
+rest of the run, since each of those derives the phase set from the flag it was given.
 
 ```bash
 K budget show --out "$AUDIT"    # ceilings, spent, remaining, elapsed, every shed note
@@ -111,17 +122,6 @@ calls a model, so it cannot measure spend - it is only real if whatever ran the 
 back on `K budget charge --tokens-in N --tokens-out M --cost-usd C`. Running inside Claude Code you
 have no per-dispatch figure to report, so leave the cost ceiling at `0` (unlimited) and charge
 dispatch counts only. It exists for harnesses that pay per token and can.
-
-`diff` mode has pre-phase engine bookkeeping before any gated phase exists: run
-`K diff "$TARGET" --out "$AUDIT" ${SINCE:+--since "$SINCE"}` once, up front. It resolves the prior
-commit, scopes to `git diff --name-only PRIOR...HEAD` (capped at 200 files), writes
-`attack-surface/diff-scope.md`, and drift-diffs against a prior baseline if one exists. If it
-reports `SKIPPED (empty or too broad)`, tell the operator and stop - there is nothing in scope for
-`DF1`. Note `diff-scope.md`, not `diff-summary.md` - the latter is DF1's own gate artifact, written
-by the DF1 scan (`kavach-sast`) once dispatched; writing it here would pre-satisfy the gate and DF1
-would never run. `merge` mode needs >= 2 source `findings.json` sets - confirm the operator gave you
-at least two source directories before starting; if not, tell them merge mode has nothing to merge
-with one.
 
 **Scope the manifest before a fan-out on anything large.**
 
@@ -135,43 +135,19 @@ and writes `attack-surface/scope-<agent>.json`, which `phase-prompt` then names 
 where to start, not a boundary: `file-manifest.txt` still holds everything and no hunter is stopped
 from opening a file the ranking missed.
 
-**Run the deterministic passes up front for any mode that does not schedule them.** `lite` opens
-with `LT0 (core:recon)` and `LT1 (core:sweep)`, so it prepares itself. `balanced`, `deep`, `diff`,
-`longshot` and `revisit` schedule neither, and almost everything downstream reads what those two
-write: `scope` ranks `file-manifest.txt`, and `slice`, `triage` and `render` all read
-`findings.json` - which **`sweep` is the only verb that creates**. A `balanced` run driven without
-them sends every hunter an empty slice and then dies in its report tail on a `findings.json`
-nothing wrote.
-
-`K plan --json` reports this so a harness does not have to carry the list:
-
-```jsonc
-"prerequisites": [ {"verb": "recon", "artifact": "recon.json"},
-                   {"verb": "sweep", "artifact": "findings.json"} ]   // empty for lite
-```
-
-It is keyed on the artifacts, not the mode, so it empties as they appear and a resume re-walks
-nothing. On a fresh run of such a mode:
-
-```bash
-K recon "$TARGET" --out "$AUDIT"
-K sweep "$TARGET" --out "$AUDIT"
-```
-
-`revisit` additionally has nothing to revisit without
-a *prior* completed KAVACH audit's durable context (a findings baseline, kill-chains, controls) for
-this target - if that's genuinely absent, tell the operator revisit needs a prior audit to revisit
-and stop; do not silently run a from-scratch audit under the revisit label.
-
 ## The phase loop
 
-Repeat until `K plan --out "$AUDIT" --mode "$MODE"` prints nothing:
+Repeat until `K plan --out "$AUDIT" --mode "$MODE" ${LIVE:+--live}` prints nothing:
 
-1. **Plan.** `K plan --out "$AUDIT" --mode "$MODE"` lists every phase whose prereqs are satisfied and
-   whose gate artifact doesn't exist yet, in mode order (`docs/phase-reference.md` has the prereq DAG
-   per mode; deep's is non-linear, everything else is a straight chain).
+1. **Plan.** `K plan --out "$AUDIT" --mode "$MODE" ${LIVE:+--live}` lists every phase whose prereqs
+   are satisfied and whose gate artifact doesn't exist yet, in pipeline order. There is one prereq
+   table for the whole 26-phase pipeline, and a preset takes the induced subgraph: an edge into a
+   phase this preset drops is rerouted onto that phase's own prereqs, transitively. So what `plan`
+   hands you is already correct for the preset and you never adjust it yourself
+   (`docs/phase-reference.md` has the edge table and the worked example).
 2. **Phase-prompt.** For each actionable phase: `K phase-prompt <phase> --out "$AUDIT" --mode "$MODE"
-   --target "$TARGET" [--agent <name>] [--index <i>]` prints **the whole dispatch, ready to send** -
+   --target "$TARGET" ${LIVE:+--live} [--agent <name>] [--index <i>]` prints **the whole dispatch,
+   ready to send** -
    the runtime header (target root, audit dir, state path, mode/phase + label, assigned output paths,
    **the exact absolute path that subagent must write its machine result to**, and the "write a
    failure note, don't fabricate" instruction), the absolute paths of every reference and audit input
@@ -181,13 +157,14 @@ Repeat until `K plan --out "$AUDIT" --mode "$MODE"` prints nothing:
    `subagent_type` as before.
 
    **On any fan-out phase, pass `--agent <the agent you are about to dispatch>` and a distinct
-   1-based `--index i` per dispatch.** Without `--index`, all eight BL3/DP4 hunters are told to
-   write `runs/dp4/kavach-sast.json` and clobber each other; the engine cannot detect that for you.
+   1-based `--index i` per dispatch.** Without `--index`, all eight `hunt` hunters are told to
+   write `runs/hunt/kavach-sast.json` and clobber each other; the engine cannot detect that for you.
    This is required, not optional.
 
-   `K plan --out "$AUDIT" --mode "$MODE" --json --target "$TARGET"` returns the same thing for
-   every actionable phase at once - roster, per-dispatch index, result path, references, gate,
-   and whether the roster is sequential - so a scripted driver never has to consult `modes.py`.
+   `K plan --out "$AUDIT" --mode "$MODE" ${LIVE:+--live} --json --target "$TARGET"` returns the same
+   thing for every actionable phase at once - roster, per-dispatch index, result path, references,
+   prereqs, gate, and whether the roster is sequential - so a scripted driver never has to consult
+   `modes.py`.
 
    **Cut each hunter its slice before you dispatch it:** `K slice <phase> --out "$AUDIT"
    --agent <name> --index <i>` writes `runs/<phase>/slices/<agent>-<i>.json` with that domain's
@@ -202,17 +179,16 @@ Repeat until `K plan --out "$AUDIT" --mode "$MODE"` prints nothing:
      | `core:recon` | `K recon "$TARGET" --out "$AUDIT"` |
      | `core:sweep` | `K sweep "$TARGET" --out "$AUDIT"` |
      | `core:render` | `K render --out "$AUDIT" --format md --controls "$AUDIT/controls.json" --mode "$MODE" --output "$AUDIT/reports/final-audit-report.md"` (report-assembly phases - see the Reconciliation tail below for the full render+gate+certify sequence) |
-     | `core:cleanup` | `K cleanup --out "$AUDIT" --mode "$MODE"` |
-     | `core:merge` (BL3/DP4 fan-out ingest) | `K merge --out "$AUDIT" --extra "$AUDIT"/runs/<phase>/*.json` (the engine now names every result file; `agent-*.json` at the audit root is legacy) |
-     | `core:merge` (`MG1,MG3-MG6` - merge mode) | `K merge-run --out "$AUDIT" --dir <source-1> --dir <source-2> [...]` - one deterministic pass over every source audit dir (each with its own `findings.json`): MG1 aliases + dedupes into `findings-index.json`, MG5 severity-renumbers and writes `rename-map.json` (old per-source display id -> new merged id), MG6 promotes the merged, renumbered set into `findings/`. MG3/MG4's gate (the workspace existing) is satisfied as a side effect of MG1. Re-run is idempotent - already-promoted findings stay put. MG2 (semantic dedup) is `kavach-chamber`, a real dispatch, not core - run it first if you want chamber-collapsed near-duplicates folded into the sources before `merge-run`. |
-     | `core:inventory` (CF1) | `K inventory --out "$AUDIT"` - indexes `$AUDIT/findings/*/` (`id`, `slug`, `dir`, `is_aggregate`, `severity`, `has_report`) into `$AUDIT/attack-surface/confirm-findings-inventory.json`. Then dispatch `kavach-reporter` to repair any finding whose `report.md` fails the vuln-report contract. The gate lands in `attack-surface/`, **not `confirm-workspace/`** - CF7's own cleanup deletes `confirm-workspace/`, so a gate there is deleted by the phase that follows it. |
-     | `core:enumerate` (LS1) | `K enumerate --out "$AUDIT" [--limit N]` - filters `$AUDIT/file-manifest.txt` to source extensions and writes `$AUDIT/attack-surface/longshot-targets.json`. Honors `KAVACH_LONGSHOT_LIMIT`. |
+     | `core:inventory` (`inventory`, `--live` only) | `K inventory --out "$AUDIT"` - indexes `$AUDIT/findings/*/` (`id`, `slug`, `dir`, `is_aggregate`, `severity`, `has_report`) into `$AUDIT/attack-surface/live-inventory.json`. Then dispatch `kavach-reporter` to repair any finding whose `report.md` fails the vuln-report contract. The gate lands in `attack-surface/`, **not `live-workspace/`** - `cleanup` deletes `live-workspace/`, so a gate there would be deleted by the phase that closes the run. |
+     | `core:cleanup` | `K cleanup --out "$AUDIT" --mode "$MODE" ${LIVE:+--live}` |
 
    - **Anything else** - a subagent name (`kavach-sast`, `kavach-kb`, `kavach-chamber`, ...). Dispatch
      via `Task` with `subagent_type` set to that name and the composed prompt from step 2.
 4. **Ingest.** `K ingest <phase> --out "$AUDIT"` with no `--result` folds **every**
    `runs/<phase>/*.json` in one call - which is the whole point of the engine naming the files. Pass
    `--result <file>` when you want exactly one. Either way it lands in `findings-draft/`.
+   `K merge --out "$AUDIT" --extra "$AUDIT"/runs/<phase>/*.json` folds those same results into
+   `findings.json`, which is what `consolidate` reads (`agent-*.json` at the audit root is legacy).
 5. **Triage, then consolidate.**
    ```bash
    K triage      --out "$AUDIT"     # classify every finding: reasoned | code | secret | dependency | iac
@@ -289,45 +265,42 @@ Charge the count you really issued, after they return - not `planned`, not `allo
 
 ### Which phases fan out
 
-- **DP2 (Patch History & Bypass Review)** - `kavach-history` first (writes
+- **`history` (Patch History & Bypass Review, deep only)** - `kavach-history` first (writes
   `attack-surface/commit-recon-report.md`), then `kavach-patch` (writes
   `attack-surface/patch-bypass-summary.md`, the phase's actual gate artifact) - sequential, not
   concurrent: the bypass review needs history's commit-log context, and only patch's output
-  satisfies DP2's gate. `PHASE_AGENT["DP2"]` names `kavach-history` alone; that's the fan-out's
-  first leg only, not the whole phase.
-- **BL3 / DP4 (Static Analysis & Triage)** - the eight domain hunters: `kavach-sast`, `kavach-api`,
+  satisfies the gate. `K plan --json` reports this roster with `"sequential": true`; do not batch it.
+- **`hunt` (Static Analysis & Triage)** - the eight domain hunters: `kavach-sast`, `kavach-api`,
   `kavach-llm`, `kavach-billing`, `kavach-crypto`, `kavach-supply`, `kavach-config`, `kavach-logic`.
   `planned = 8`, then **batch them over `KAVACH_MAX_AGENTS`** by the protocol above - at the default
   6 that is a batch of 6 then a batch of 2. Each hunter gets `--agent <its name> --index <1..8>`, so
-  each writes its own `runs/<phase>/<agent>-<i>.json`. `kavach-sast` additionally owns the phase's
-  literal gate artifact (`source-sink-flows-all-severities.md` at BL3/DP4, `lite-q2-summary.md` at
-  LT2, `diff-summary.md` at DF1, `revisit-r7-chamber-summary.md` at RV7) - dispatch it in the first
-  batch so the gate can close; the other seven domains' outputs still get folded in via ingest even
-  though they don't own that file.
-- **BL4 (Manual Attack Surface Probe)** - `kavach-probe` alone; it consumes the attack surface the
-  eight domains just built.
-- **DP5-DP7 (Authorization / State-Concurrency / Spec-Gap)** - `kavach-api` (authz-matrix mode),
-  `kavach-state`, `kavach-spec` all depend only on DP3, so all three fit in one batch at the default
-  cap. Distinct phase ids, so each gets its own `budget check`/`charge` - or check once with
-  `--planned 3` against the phase you are entering and charge the same phase.
-- **DP8 probe team** - `kavach-probe` first, then `kavach-reasoner-backward` ‖ `kavach-reasoner-
-  contradiction` in parallel, then `kavach-harvester` (applies causal challenge before any
-  INVALIDATED verdict) - sequential stages, parallel only within the reasoner pair. Governed by
-  `references/probe-protocol.md`.
-- **DP10 / BL5 / RV8 / MG2 chamber** - `kavach-chamber` (the judge) orchestrates `kavach-ideator` ->
-  `kavach-tracer` -> `kavach-advocate` per cluster, with `kavach-variant-scout` running in the
-  background throughout. Deep (DP10) runs this as a full multi-agent debate; balanced (BL5) is a
-  single chamber pass with just the advocate step. Governed by `references/chamber-protocol.md`.
-- **BL6/BL6b, DP13/DP14, RV11/RV11b, LT3 (PoC + report drafting)** - per-finding fan-out over
-  `findings/*/`, **excluding every dir whose `metadata.json` has `is_aggregate: true`** (the `G*`
-  dirs) and every `FP-*` dir. `planned` = that filtered count. Batch by the protocol above,
-  `--index i` per finding, `kavach-poc` first and `kavach-reporter` once that finding's PoC lands.
-  **These phases no longer gate on `findings/` existing** - they gate on a coverage artifact you
-  write after each batch:
+  each writes its own `runs/hunt/<agent>-<i>.json`. `kavach-sast` owns the phase's literal gate
+  artifact (`attack-surface/source-sink-flows-all-severities.md`) - dispatch it in the first batch
+  so the gate can close; the other seven domains' outputs still get folded in via ingest even though
+  they don't own that file. **Under `lite` the roster is `kavach-sast` alone**, so `planned = 1`;
+  take the roster from `K plan --json`, never from this list.
+- **`probe` (Manual Attack Surface Probe)** - `kavach-probe` alone as far as the engine is concerned
+  (`planned = 1`); it then runs its own team internally - `kavach-reasoner-backward` ‖
+  `kavach-reasoner-contradiction` in parallel, then `kavach-harvester`, which applies causal
+  challenge before any INVALIDATED verdict. Governed by `references/probe-protocol.md`.
+- **`authz` / `state` / `spec` (deep only)** - `kavach-api` (authz-matrix mode), `kavach-state`,
+  `kavach-spec` all depend only on `kb`, so all three come back actionable together and fit in one
+  batch at the default cap. Distinct phase ids, so each gets its own `budget check`/`charge`.
+- **`chamber`** - `kavach-chamber` (the judge) orchestrates `kavach-ideator` -> `kavach-tracer` ->
+  `kavach-advocate` per cluster, with `kavach-variant-scout` running in the background throughout.
+  One phase and one gate (`attack-surface/chamber-summary.md`) whichever preset scheduled it; what
+  differs is how much attack surface is underneath it, since `deep` reaches it with `authz`, `state`,
+  `spec`, `crossservice` and `history` already done. Governed by `references/chamber-protocol.md`.
+- **`poc` / `report` (PoC + report drafting)** - per-finding fan-out over `findings/*/`, **excluding
+  every dir whose `metadata.json` has `is_aggregate: true`** (the `G*` dirs) and every `FP-*` dir.
+  `planned` = that filtered count. Batch by the protocol above, `--index i` per finding,
+  `kavach-poc` first and `kavach-reporter` once that finding's PoC lands. `lite` schedules `poc`
+  without `report`. **These phases do not gate on `findings/` existing** - they gate on a coverage
+  artifact you write after each batch:
 
   ```bash
-  K coverage --out "$AUDIT" --phase poc      # -> attack-surface/poc-coverage.json    (BL6/DP13/RV11/LT3)
-  K coverage --out "$AUDIT" --phase report   # -> attack-surface/report-coverage.json (BL6b/DP14/RV11b)
+  K coverage --out "$AUDIT" --phase poc      # -> attack-surface/poc-coverage.json
+  K coverage --out "$AUDIT" --phase report   # -> attack-surface/report-coverage.json
   ```
 
   Exit 0 = complete, the gate closes and `K plan` stops listing the phase. Exit **7** = incomplete,
@@ -335,18 +308,14 @@ Charge the count you really issued, after they return - not `planned`, not `allo
   it **after every batch, not once at the end**: it is the gate, so an unrun `coverage` leaves the
   phase actionable forever, and a stale one closes the gate on work that never happened. Aggregates
   count as already satisfied, so they never appear in `missing[]`.
-- **LS2 (per-file hail-mary)** - same per-item batching, one `kavach-longshot-hunter` per file from
-  `longshot-targets.json`, `--index i` per file, respecting the same cap; mark each target's status
-  via the engine's `kb.update_target_status` equivalent (or just track it in your own batch
-  bookkeeping) so a retry doesn't re-hunt a file that already produced a no-finding marker. LS2's
-  gate is `attack-surface/longshot-hunt-summary.json` - the hunt roll-up, written by you when the
-  swarm finishes. It used to be `findings-draft/`, which cleanup deletes, so any cleanup made the
-  whole swarm eligible to re-run.
-- **DP11-DP12, RV9-RV10k (verification/variant)** - one dispatch per surviving Critical/High
+- **`verify` / `variant` (deep only)** - one dispatch per surviving Critical/High
   (`kavach-verifier` cold zero-context re-check, then `kavach-variant` per finding); `kavach-triager`
-  runs as a cheap gate between DP11 and DP13 to narrow what's worth a variant search - not a phase of
-  its own, just budget discipline you apply before batching DP12/DP13. `kavach-triager` is a haiku
+  runs as a cheap gate between them to narrow what's worth a variant search - not a phase of its own,
+  just budget discipline you apply before batching `variant` and `poc`. `kavach-triager` is a haiku
   agent by design: it emits one P0/P1/P2/skip label on one finding summary.
+- **`exploit` / `testgen` (`--live` only)** - one dispatch per finding carrying a runnable PoC,
+  then one per finding live execution could not confirm. Both are inside the live-validation
+  charter: state the blast radius and wait for explicit go-ahead before **each** exploit attempt.
 
 ### Retry / resume
 
@@ -358,13 +327,14 @@ an in-progress audit is always a valid resume regardless.
 
 ## Reconciliation tail
 
-Once `K plan` returns nothing for the mode's non-report phases, VAJRA does the reconciliation work
-the engine can't do for you:
+Once `K plan` returns nothing but the preset's report and cleanup phases, VAJRA does the
+reconciliation work the engine can't do for you:
 
 1. **Triage and consolidate everything.** `K triage --out "$AUDIT" && K consolidate --out "$AUDIT"`
-   (both idempotent - safe to run again here). Then close the two coverage gates one last time:
-   `K coverage --out "$AUDIT" --phase poc` and `--phase report`. Whatever they still report as
-   `missing` is what the report will print under Limits, so look at it before you render.
+   (both idempotent - safe to run again here). Then close the coverage gates one last time:
+   `K coverage --out "$AUDIT" --phase poc` and `--phase report` (`lite` gates on `poc` alone, since
+   it does not schedule `report`). Whatever they still report as `missing` is what the report will
+   print under Limits, so look at it before you render.
 2. **Build `controls.json` fail-closed.** For each of the 8 gate controls in `references/
    finding-schema.md` / `references/certification.md`, set `true` only if the phase(s) that owned that
    surface proved it across the *whole* codebase; otherwise `false`. Write it to
@@ -432,23 +402,24 @@ the engine can't do for you:
    ```
    Flips this audit's `audit-state.json` entry to `complete`, stamps `completed_at`, and records the
    resolved commit (`git rev-parse HEAD`, or null if the target has no git repo). It also snapshots
-   the current `findings.json` to a durable, commit-keyed `attack-surface/findings-baseline-<commit>.json`
-   - this is the baseline a later `diff`/`revisit` run diffs against, so skip this step only if the
-   target truly has no git history at all.
+   the current `findings.json` to a durable, commit-keyed
+   `attack-surface/findings-baseline-<commit>.json.gz` - this is the baseline a later `kavach diff`
+   drift-diffs against, so skip this step only if the target truly has no git history at all.
 8. **Cleanup.**
    ```bash
-   K cleanup --out "$AUDIT" --mode "$MODE"
+   K cleanup --out "$AUDIT" --mode "$MODE" ${LIVE:+--live}
    ```
-   Removes `tmp/`, `findings-draft/`, and mode-specific workspaces once their durable output has
-   landed; writes `attack-surface/<mode>-cleanup-summary.json`. If it reports `N unexpected root
+   Removes `tmp/`, `findings-draft/` and `live-workspace/` once their durable output has landed;
+   writes `attack-surface/cleanup-summary.json` - one filename for all three presets, because one
+   phase cannot gate on a name that varies with the preset. If it reports `N unexpected root
    file(s), left in place`, tell the operator: those are files something invented outside the
    engine's naming contract. Cleanup reports them and never deletes them - deleting an unknown file
    in someone's repo is not the engine's call.
 
-`confirm` mode's tail is `reports/confirmation-report.md` via `kavach-confirm-reporter` (CF6) instead
-of `reports/final-audit-report.md`, then `CF7`'s `core:cleanup` with redaction.
-`merge`/`revisit`/`longshot` each reuse the same render/gate/certify/cleanup shape at their own final
-phase - see `docs/phase-reference.md` for exactly which phase id closes out each mode.
+Under `--live` the tail runs on: `certify` writes `reports/confirmation-report.md` via
+`kavach-confirm-reporter` **in addition to** `reports/final-audit-report.md`, and `cleanup` waits on
+it - `cleanup`'s prereqs resolve to `render` and `certify` together, so the redaction pass is the
+last thing that runs. Without `--live` there is no confirmation report at all.
 
 ## Optional: export the findings to a tracker
 
@@ -478,27 +449,28 @@ Confirm, or go back and fix:
 
 - [ ] Recon walked every folder (`file-manifest.txt` present) and the audit was tailored to the
       detected stack.
-- [ ] Every phase `K plan` was ever going to list for this mode is now gated complete (or explicitly
-      skipped with a reason) - no silent gaps.
+- [ ] Every phase `K plan` was ever going to list for this preset is now gated complete (or
+      explicitly skipped with a reason) - no silent gaps.
 - [ ] Every finding cites a real `file:line`; every "control present" claim cites the enforcing line.
 - [ ] All six kill chains traced to a control or to EXPLOITABLE in `attack-surface/kill-chains.md`.
 - [ ] Billing end-to-end and key-exposure end-to-end were both deeply audited (the two top priorities).
-- [ ] Every promoted finding's `findings/<id>-<slug>/report.md` is self-contained - no pointers back
+- [ ] Every `findings/<id>-<slug>/report.md` this run wrote is self-contained - no pointers back
       to a draft, a debate, or a phase id.
 - [ ] No invented CVEs; no unread line numbers; honest calibration; honest verdict + certification.
-- [ ] `confirm` mode: nothing live ran without the explicit `--confirm`/`--live` opt-in on record.
+- [ ] Nothing live ran without the explicit `--live` opt-in on record.
 - [ ] None of the persona's banned behaviors occurred.
 
 - [ ] Every fan-out went through `K budget check` before it dispatched and `K budget charge` after,
       so `K budget show` accounts for the run and the report's Limits section is honest.
 - [ ] `attack-surface/narrative.json` has all six keys filled - no section shipped as
       "_Not supplied by the reconciler._".
-- [ ] Both coverage artifacts report `complete: true`, or the report names every gap under Limits.
+- [ ] Every coverage artifact this preset gates on reports `complete: true`, or the report names
+      every gap under Limits (`lite` gates on `poc` only; `balanced`/`deep` on both).
 - [ ] No `G*` aggregate was dispatched to `kavach-poc` or `kavach-reporter`.
 
 Report location: **`$TARGET/.kavach/reports/`** - `final-audit-report.md` (primary human deliverable),
 `audit-report.html`, `audit-report.pdf`, `report.json`, `report.sarif`, and `confirmation-report.md`
-under confirm mode - plus, per finding, `$TARGET/.kavach/findings/<id>-<slug>/report.md`. The old
+under `--live` - plus, per finding, `$TARGET/.kavach/findings/<id>-<slug>/report.md`. The old
 single `KAVACH_SECURITY_REPORT.md` is retired - do not write to it, and nothing in the engine does.
 Tell the operator the verdict and where the deliverables live.
 

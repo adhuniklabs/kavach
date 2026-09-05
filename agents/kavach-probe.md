@@ -35,7 +35,7 @@ You receive, in your dispatch prompt:
 Read `.kavach/attack-surface/knowledge-base-report.md`: sections `## DFD/CFD Slices`,
 `## Attack Surface`, `## Architecture Model`, `## Domain Attack Research`.
 
-**Read the intent corpus** (revisit mode, optional): if `.kavach/attack-surface/intent-corpus.json`
+**Read the intent corpus** (optional): if `.kavach/attack-surface/intent-corpus.json`
 exists (written by `kavach-intent`), scan its `acknowledged_risks[]` array. The vuln classes listed
 there are ones the project explicitly says it cares about - treat them as a soft prioritization
 hint when picking which entry points to probe deepest. Do NOT skip entry points or classes that

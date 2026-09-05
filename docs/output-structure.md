@@ -45,41 +45,41 @@ what the run has spent and everything it decided to drop.
 │   ├── knowledge-base-report.md    #   master project model: classification, arch, DFD/CFD,
 │   │                               #   threat model, domain attack research, spec-gap candidates
 │   ├── unauthenticated-surface.md  #   anon-reachable entry points
-│   ├── authz-matrix.md             #   per-endpoint guard matrix (deep DP5)
+│   ├── authz-matrix.md             #   per-endpoint guard matrix (`authz`, deep)
 │   ├── architecture-entrypoints.md
 │   ├── sbom.json                   #   9-category component inventory (kavach-intel)
-│   ├── advisory-summary.md         #   3-tier CVE/GHSA/OSV advisory intel + heatmap
+│   ├── advisory-summary.md         #   3-tier CVE/GHSA/OSV advisory intel + heatmap (`intel`)
 │   ├── commit-recon-report.md      #   git-history security forensics (kavach-history)
-│   ├── patch-bypass-summary.md     #   prior-fix bypass verdicts (kavach-patch)
+│   ├── patch-bypass-summary.md     #   prior-fix bypass verdicts (`history`, kavach-patch)
+│   ├── source-sink-flows-all-severities.md  # `hunt`'s gate, owned by kavach-sast
 │   ├── state-concurrency-summary.md
 │   ├── spec-gap-summary.md
-│   ├── manual-attack-surface-inventory.md
-│   ├── deep-probe-summary.md
+│   ├── manual-attack-surface-inventory.md   # kavach-probe's side artifact, not a gate
+│   ├── probe-summary.md            #   `probe`'s gate
 │   ├── cross-service-edges.json / .md
-│   ├── variant-summary.md
-│   ├── diff-summary.md             #   diff mode only
+│   ├── chamber-summary.md  adversarial-verification.md  variant-summary.md
+│   │                               #   `chamber` / `verify` / `variant` gates
+│   ├── intent-corpus.json          #   documented-intent corpus (`intent`; FP suppression)
+│   ├── intent-crosscheck.json      #   per-finding match/partial/no/contested (`crosscheck`)
+│   ├── diff-scope.md               #   the `kavach diff` verb's scope report
 │   ├── findings-baseline-<commit>.json.gz  # commit-keyed drift baseline, gzipped, written by
 │   │                               #   `state complete`. A plain .json from 0.2.x still loads.
-│   ├── poc-coverage.json           #   per-finding PoC coverage - THE GATE for LT3/BL6/DP13/RV11
-│   ├── report-coverage.json        #   per-finding report coverage - the gate for BL6b/DP14/RV11b
+│   ├── poc-coverage.json           #   per-finding PoC coverage - `poc`'s gate
+│   ├── report-coverage.json        #   per-finding report coverage - `report`'s gate
 │   ├── promoted-index.json         #   kavach_id -> dir for every dir consolidate wrote. The
 │   │                               #   live set the coverage gates are scoped to.
 │   ├── narrative.json              #   VAJRA's prose for the six render anchors
-│   ├── merge-index.json  merge-dedup-decisions.json  merge-rename-map.json   # merge-mode gates
-│   ├── confirm-findings-inventory.json  confirm-intent-crosscheck.json       # confirm-mode gates
-│   ├── confirm-env-strategies.json  confirm-env-connection.json             #   (redacted - see below)
-│   ├── confirm-poc-results.json  confirm-test-mapping.json                  #   (redacted - see below)
-│   ├── deep-chamber-summary.md  adversarial-verification.md  # deep DP10 / DP11 gates
-│   ├── longshot-hunt-summary.json  #   per-file swarm roll-up (longshot LS2 gate)
-│   ├── longshot-targets.json       #   SIDECAR per-file swarm state (longshot LS1/LS2)
-│   ├── longshot-summary.md
-│   ├── intent-corpus.json          #   documented-intent corpus (kavach-intent; FP suppression)
+│   ├── merge-index.json  merge-rename-map.json  merge-dedup-decisions.json
+│   │                               #   written by the `kavach merge-run` verb
+│   ├── live-inventory.json         #   `inventory`'s gate - the findings tree indexed for --live
+│   ├── env-strategies.json  env-connection.json   # `envscan` / `provision` (redacted - see below)
+│   ├── poc-results.json  test-mapping.json        # `exploit` / `testgen`  (redacted - see below)
 │   ├── attack-pattern-registry.json
 │   ├── kill-chains.md              #   the 6 KAVACH kill chains filled leaf-by-leaf (VAJRA)
-│   ├── merge-summary.md            #   merge mode only
-│   └── <mode>-cleanup-summary.json #   written by the mode's final cleanup phase
+│   ├── merge-summary.md            #   written by the `kavach merge-run` verb
+│   └── cleanup-summary.json        #   written by `cleanup`; one name for all three presets
 ├── findings-draft/                 # TRANSIENT per-phase drafts (removed by cleanup)
-│   └── <prefix>-NNN-<slug>.md      #   prefix = phase id lowercased, e.g. bl3-001-sqli.md
+│   └── <phase>-NNN-<slug>.md       #   phase id, e.g. hunt-001-sqli.md
 ├── findings/                       # DURABLE promoted findings - the deliverable core
 │   ├── <C1|H1>-<slug>/             #   individually promoted; see "The finding-dir contract" below
 │   ├── G1-vulnerable-dependencies/ #   AGGREGATE: every dependency-class finding, rolled up
@@ -94,26 +94,25 @@ what the run has spent and everything it decided to drop.
 │   ├── audit-report.pdf            #   real page numbers + Contents; needs the [report] extra
 │   ├── report.json                 #   machine render (aggregate)
 │   ├── report.sarif                #   SARIF 2.1.0, for code-scanning integrations
-│   ├── confirmation-report.md      #   confirm mode only - 9-state per-finding verdicts
+│   ├── confirmation-report.md      #   `--live` only - 9-state per-finding verdicts (`certify`)
 │   └── issues.json                 #   `kavach issues plan` export plan (operator verb only)
 ├── runs/                           # DURABLE (prunable) - per-phase sub-agent machine results
-│   └── <phase>/<agent>[-<index>].json      #   e.g. runs/dp4/kavach-sast-3.json
-├── reinvest-report.md              # deferred mode, not shipped - listed for completeness only
+│   └── <phase>/<agent>[-<index>].json      #   e.g. runs/hunt/kavach-sast-3.json
+├── reinvest-report.md              # legacy durable name; nothing in the engine writes it
+├── live-workspace/                 # TRANSIENT --live working state (removed by cleanup)
 └── tmp/                            # TRANSIENT workspaces (removed by cleanup)
     ├── runs/<run_id>/               #   per-sub-agent: prompt.md, transcript.jsonl, result.md, error.txt
     ├── chamber-workspace/<cluster>/ #   debate.md, variant-candidates/
     ├── probe-workspace/<component>/ #   attack-surface-map.md, code-anatomy.md, probe-state.json
-    ├── merge-workspace/              #   per-source aliases (a, b, …) for merge mode
+    ├── merge-workspace/              #   per-source aliases (a, b, …) for `kavach merge-run`
     ├── verifier-reviews/             #   cold-verifier full per-finding reviews
-    ├── confirm/                      #   confirm-mode working state INCLUDING credentials
-    └── real-env-evidence/<slug>/     #   confirm-mode live reproduction artifacts (gated)
+    └── real-env-evidence/<slug>/     #   `--live` reproduction artifacts, INCLUDING credentials
 ```
 
 `runs/<phase>/` is a **different directory** from the transient `tmp/runs/<run_id>/`. The former is
 the engine's durable result contract (`dispatch.result_path`); the latter is one sub-agent
-invocation's scratch space. The `<phase>` component is lowercased and slugified with the same rule
-as the `findings-draft/` prefix - `DP4` -> `dp4`, `CF1_5` -> `cf1-5`, `RV10k` -> `rv10k` - so any
-glob over it uses the lowercase form.
+invocation's scratch space. The `<phase>` component is slugified, and phase ids are already lowercase
+single words, so it is the phase id verbatim - `hunt`, `crossservice`, `poc`.
 
 A root-level `agent-<domain>.json` is **legacy**. Cleanup still recognises it so it is not reported
 as unexpected, but the engine-issued path is `runs/<phase>/<agent>.json`, named in the
@@ -122,8 +121,8 @@ a result filename can come from.
 
 ## Durable vs transient
 
-Durable artifacts are the deliverable - they survive every mode's cleanup phase (LT4/BL7/DP17/
-CF7/etc.) and are never touched by anything except the phase that authored them:
+Durable artifacts are the deliverable - they survive the `cleanup` phase every preset ends on, and
+are never touched by anything except the phase that authored them:
 
 - `audit-state.json`, `recon.json`, `file-manifest.txt`, `sweep-summary.json`, `findings.json`,
   `controls.json`
@@ -134,21 +133,21 @@ CF7/etc.) and are never touched by anything except the phase that authored them:
 - `final-audit-report.md`, `report.json`, `report.sarif`, `confirmation-report.md` at the audit root
   are kept durable for **legacy trees**; nothing writes them there any more
 
-Transient artifacts are working state for a single run and are wiped by the mode's cleanup phase
-once the durable artifacts they fed are written:
+Transient artifacts are working state for a single run and are wiped by the `cleanup` phase once the
+durable artifacts they fed are written. `cleanup.TRANSIENT` is exactly three paths:
 
 - `findings-draft/`
+- `live-workspace/` - the `--live` tail's working state, credentials included
 - `tmp/` (all of it: `runs/`, `chamber-workspace/`, `probe-workspace/`, `merge-workspace/`,
-  `adversarial-reviews/`, `real-env-evidence/`)
-- mode-specific workspaces (`confirm-workspace/`) once `CF7`/equivalent has run
+  `verifier-reviews/`, `real-env-evidence/`)
 
-**No phase gate may resolve under a transient path.** A gate the mode's own cleanup deletes makes
-its phase eligible again on every resume, so the run pays for the same fan-out twice; a test
-(`test_modes.py::test_no_gate_under_transient`) enforces it for every phase in every mode. That is
-why the confirm, merge, chamber, verification and longshot gate artifacts all live under
-`attack-surface/` now.
+**No phase gate may resolve under a transient path.** A gate `cleanup` deletes makes its phase
+eligible again on every resume, so the run pays for the same fan-out twice; a test
+(`test_modes.py::test_no_gate_under_transient`) enforces it for every phase in the pipeline. That is
+why every gate artifact sits at the audit root, under `attack-surface/`, or under `reports/` -
+never in a workspace.
 
-Cleanup writes a `<mode>-cleanup-summary.json` under `attack-surface/` recording what it removed,
+Cleanup writes `attack-surface/cleanup-summary.json` recording what it removed,
 what it retained, what it expected but didn't find, and what it did not recognise:
 `{removed, retained, missing, unexpected}`. That summary itself is durable, so a later audit can
 see what the previous cleanup did.
@@ -171,7 +170,7 @@ findings/C1-sql-injection-in-login/
 ├── poc.py                # runnable PoC (substitution vars + last-line JSON verdict)
 │   └── poc.theoretical.md    # OR: a theoretical PoC when Confidence is suspected / static-only
 ├── metadata.json          # kavach_id, severity, cvss_vector, kill_chain, is_variant, confirm_status
-└── evidence/               # setup/exploit/impact logs; real-env evidence under confirm mode
+└── evidence/               # setup/exploit/impact logs; real-env evidence under `--live`
 ```
 
 `report.md` must satisfy the vuln-report contract enforced by `report_finding.py`: exactly the
@@ -304,8 +303,8 @@ treat `is_aggregate: true` as already satisfied. `kavach report-finding G1` is a
 
 ```json
 "budget": {"max_dispatches": 120, "max_wall_seconds": 10800, "dispatches": 47,
-           "started_at": "…", "by_phase": {"DP4": 8, "DP13": 22},
-           "shed": [{"phase": "DP13", "planned": 40, "allowed": 22, "dropped": 18,
+           "started_at": "…", "by_phase": {"hunt": 8, "poc": 22},
+           "shed": [{"phase": "poc", "planned": 40, "allowed": 22, "dropped": 18,
                      "reason": "dispatch ceiling", "at": "…"}]}
 ```
 
@@ -341,7 +340,8 @@ KAVACH carries **two** ids per finding, deliberately never conflated:
   excluding the line number**, so it survives the surrounding code shifting. This is the id stored
   in `metadata.json.kavach_id`, in `findings.json`, in `reports/report.sarif`'s `kavachId` field,
   and in a tracker issue body (which is how a re-audit comments instead of filing a duplicate). It is
-  what cross-run drift-diffing (`diffing.py`, diff mode's new/fixed/unchanged classification) and
+  what cross-run drift-diffing (`diffing.py`, the `kavach diff` verb's new/fixed/unchanged
+  classification) and
   any external SARIF consumer key off.
 
 Rule of thumb: use the display id (`C1`) when talking to a person about a specific finding in this

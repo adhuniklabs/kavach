@@ -30,9 +30,9 @@ On dispatch you are given:
 
 `persona.md`'s live-validation charter is binary, no in-between. Every dispatch of this agent runs
 under the **static-only** branch unless the orchestrator has explicitly told you this specific
-finding carries the `--live`/confirm charter:
+finding carries the `--live` charter:
 
-- **Charter inactive (the default - true for every `lite`/`balanced`/`deep`/`revisit` dispatch, and
+- **Charter inactive (the default - true for every dispatch of any preset without `--live`, and
   for any `kavach-poc` call that doesn't say otherwise):** you never send a request to a running
   instance of the target app, never open a socket to it, never touch a real credential. A PoC whose
   proof requires hitting the live app is **not authored as a runnable script at all** - you write
@@ -93,7 +93,7 @@ Quality bar (mirrors `report-template.md` §6b's PoC contract):
 - **Label `PoC-Status` accurately** - `executed | theoretical | blocked`.
 
 **Substitution variables** - use these instead of hardcoded URLs/tokens, so the identical script
-still works once a live environment exists (a future confirm-mode PoC executor fills them in; never
+still works once a live environment exists (the live PoC executor fills them in; never
 bake `localhost:8080` or a real credential into the script):
 
 | Variable | What it expands to at confirm time |
@@ -114,7 +114,7 @@ Allowed `status` values: `confirmed`, `failed`, `inconclusive`. `evidence` names
 observed* that proves exploitation - the response artifact, not the request (e.g. `"admin role
 assigned to attacker session"`, `"DB error message containing query string"`, `"file /etc/passwd
 contents in HTTP body"`). Whatever runs this script - your own local-harness invocation, or a
-downstream confirm-mode executor - parses this line to assign the verdict deterministically;
+downstream live PoC executor - parses this line to assign the verdict deterministically;
 without it the verdict degrades to fragile log heuristics. Always print it to stdout as the LAST
 output line; earlier free-form prints are fine for a human reader.
 
@@ -134,7 +134,7 @@ runtime test that would confirm it, per severity-model.md's confidence disciplin
 ## Reproduction steps (as they would run under the live-validation charter)
 1. [Setup step]
 2. [Exploit request/payload - use the same {{BASE_URL}}/{{TOKEN_*}} substitution vars as §3a, so
-   this doubles as the spec a future confirm-mode executor would implement]
+   this doubles as the spec the live PoC executor implements]
 3. [Expected observed result, and why the code path proves it]
 
 ## Code-level evidence
@@ -206,7 +206,7 @@ wrote - same discipline `kavach-poc-executor` §7 follows):
 }
 ```
 
-This JSON copy, not the `draft.md` prose fields, is what a later confirm-mode `kavach-poc-executor`
+This JSON copy, not the `draft.md` prose fields, is what a later `kavach-poc-executor`
 pass actually reads - that pass may run in a separate session, long after `kavach-reporter` has
 already consumed and moved past `draft.md`, so the live executor needs its own durable copy of the
 connection contract. Field names and value shapes must match exactly what `kavach-poc-executor` §1

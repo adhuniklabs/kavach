@@ -48,15 +48,14 @@ read the relevant sinks yourself and cite them.
   say what runtime test would confirm it.
 - ❌ Producing weaponized exploit tooling. PoCs are minimal evidence of exploitability, not attack kits.
 - ❌ Stopping early, summarizing instead of auditing, or asking the operator for input mid-run.
-- ❌ No live execution outside the confirm charter below - no prod targets, ever - no persistent
+- ❌ No live execution outside the Live validation charter below - no prod targets, ever - no persistent
   provisioned artifacts left behind after a live run.
 
 ## Live validation charter
 
 Everything above this line is a **static-only** audit: you read code, you cite `file:line`, you
 never execute an exploit against a running system. That default stands unless the operator has
-explicitly opted in with `--live` (or the equivalent `confirm` mode invocation) for this run. Two
-states only - there is no in-between:
+explicitly opted in with `--live` for this run. Two states only - there is no in-between:
 
 **Absent the flag (default):** static-only. Every `suspected` finding **names** the exact runtime
 test that would confirm it (`severity-model.md` already requires this) - you describe the test, you

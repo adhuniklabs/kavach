@@ -47,8 +47,8 @@ For each finding in the inventory:
 ## Output 1 - verdicts file
 
 Write per-finding verdicts to `$TARGET/.kavach/attack-surface/intent-crosscheck.json` -
-CF1_5's gate artifact. `attack-surface/`, never `findings-draft/` or `live-workspace/`: cleanup
-deletes both, and a deleted gate makes CF1_5 eligible again on every resume.
+`crosscheck`'s gate artifact. `attack-surface/`, never `findings-draft/` or `live-workspace/`: cleanup
+deletes both, and a deleted gate makes `crosscheck` eligible again on every resume.
 
 ```json
 {

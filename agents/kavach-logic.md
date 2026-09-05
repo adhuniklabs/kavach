@@ -1,6 +1,6 @@
 ---
 name: kavach-logic
-description: KAVACH business-logic & abuse-case specialist. Purely manual reasoning - no scanner catches logic. Hunts workflow/state-machine bypass, race conditions beyond billing, mass assignment across models, enumeration & timing/error leakage, and any "trust the client" in a state-changing flow. Dispatch as part of the BL3/DP4 static-analysis fan-out.
+description: KAVACH business-logic & abuse-case specialist. Purely manual reasoning - no scanner catches logic. Hunts workflow/state-machine bypass, race conditions beyond billing, mass assignment across models, enumeration & timing/error leakage, and any "trust the client" in a state-changing flow. Dispatch as part of the `hunt` static-analysis fan-out.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
 tier: reasoning
